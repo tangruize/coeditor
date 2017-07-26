@@ -11,10 +11,15 @@
 
 #include "common.h"
 
-/* make assert() effective */
+/* make assert() effective, comment it to disable */
+//#define DEBUG
+#ifdef DEBUG
 #ifdef NDEBUG
 #undef NDEBUG
-#endif
+#endif /* NDEBUG */
+#else
+#define NDEBUG
+#endif /* DEBUG */
 
 #include <cassert>
 
@@ -31,13 +36,19 @@ extern const char *program_name;
  * if term is 'true', terminate with status EXIT_FAILURE
  * term and lineno are encapsulated by macro, see below
  */
-void _err(prompt_t &errmsg, bool term, int lineno);
+extern "C" void _err(prompt_t &errmsg, bool term, int lineno);
 
 #define errExit(msg) _err(msg, true, __LINE__)
 #define errMsg(msg) _err(msg, false, __LINE__)
 #define PROMT_ERROR(msg) do { \
         if (msg != NOERR) { \
             errMsg(msg); \
+        } \
+    } while(0)
+
+#define EXIT_ERROR(msg) do { \
+        if (msg != NOERR) { \
+            errExit(msg); \
         } \
     } while(0)
 

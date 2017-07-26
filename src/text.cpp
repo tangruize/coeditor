@@ -220,3 +220,40 @@ prompt_t textOp::saveFile(const string &filename) {
     return NOERR;
 }
 
+extern "C" {
+
+/* init the editing file */
+prompt_t loadFile(textOp &file, const string &filename) {
+    return file.loadFile(filename);
+}
+
+/* print buf for debug */
+void printLines(textOp &file, int start, int count) {
+    file.printLines(start, count);
+}
+
+/* delete a character, if offset is 0, will join a line */
+prompt_t deleteChar(textOp &file, pos_t pos) {
+    return file.deleteChar(pos);
+}
+
+/* insert a character, if it is a newline, will add a line */
+prompt_t insertChar(textOp &file, pos_t pos, char c) {
+    return file.insertChar(pos, c);
+}
+
+/* save file */
+prompt_t saveToFile(textOp &file, const string &filename) {
+    return file.saveFile(filename);
+}
+
+prompt_t saveCurFile(textOp &file) {
+    return file.saveFile();
+}
+
+/* get file name */
+string getFilename(textOp &file) {
+    return file.getFilename();
+}
+
+}

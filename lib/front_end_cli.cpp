@@ -9,6 +9,7 @@
 #include "common.h"
 #include "front_end.h"
 #include "op.h"
+#include <unistd.h>
 
 /* using dynamic linking, C linkage is preferred */
 extern "C" {
@@ -19,11 +20,17 @@ static string ps = DEFAULT_PS;
 const char *front_end_version = "CLI 0.1";
 const char *front_end_author = "Ruize Tang";
 
+static inline void shellPrompt() {
+    if (isatty(STDERR_FILENO)) {
+        write(STDERR_FILENO, ps.c_str(), ps.size());
+    }
+}
+
 /* the front-end function */
 void frontEnd(textOp &file) {
     string line, cmd, data;
     op_t op;
-    for (cerr << ps; getline(cin, line); cerr << ps) {
+    for (shellPrompt(); getline(cin, line); shellPrompt()) {
         if (line.size() == 0) {
             continue;
         }

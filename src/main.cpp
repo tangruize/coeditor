@@ -16,9 +16,7 @@ int main(int argc, char *argv[]) {
     }
     textOp file;
     auto msg = file.loadFile(argv[1]);
-    if (msg != NOERR) {
-        errExit(msg);
-    }
+    EXIT_ERROR(msg);
     frontEnd(file);
     return 0;
 }
