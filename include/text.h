@@ -74,33 +74,4 @@ private:
     file_t::iterator locateLine(int no);
 };
 
-/* Because of C++ name mangling, and our shared libraries use external code,
- * dynamic linker probably cannot find the symbol if using another version,
- * to avoid mangling, we must define some "C" linkage functions.
- * Yes, it is due to the poor design (shared libraries using external code).
- */
-
-extern "C" {
-
-/* init the editing file */
-prompt_t loadFile(textOp &file, const string &filename);
-
-/* print buf for debug */
-void printLines(textOp &file, int start, int count);
-
-/* delete a character, if offset is 0, will join a line */
-prompt_t deleteChar(textOp &file, pos_t pos);
-
-/* insert a character, if it is a newline, will add a line */
-prompt_t insertChar(textOp &file, pos_t pos, char c);
-
-/* save file */
-prompt_t saveToFile(textOp &file, const string &filename);
-prompt_t saveCurFile(textOp &file);
-
-/* get file name */
-string getFilename(textOp &file);
-
-}
-
 #endif

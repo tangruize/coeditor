@@ -12,7 +12,7 @@
 #include "common.h"
 
 /* make assert() effective, comment it to disable */
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #ifdef NDEBUG
 #undef NDEBUG
@@ -36,7 +36,7 @@ extern const char *program_name;
  * if term is 'true', terminate with status EXIT_FAILURE
  * term and lineno are encapsulated by macro, see below
  */
-extern "C" void _err(prompt_t &errmsg, bool term, int lineno);
+void _err(prompt_t &errmsg, bool term, int lineno);
 
 #define errExit(msg) _err(msg, true, __LINE__)
 #define errMsg(msg) _err(msg, false, __LINE__)

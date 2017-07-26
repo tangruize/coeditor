@@ -19,11 +19,27 @@ CXXFLAGS += -fPIC
 
 all : ${LIBS}
 
+# Because of C++ name mangling, and our shared libraries use external code,
+# dynamic linker probably cannot find the symbol if using another version,
+# to avoid this problem, we must remove ELF file and re-link.
+# Yes, it is due to the poor design (shared libraries using external code).
 use-cli : ${FRONT_END_CLI_LIB}
-	ln -sf $< libfrontend.so.1
+	@ if [ `readlink libfrontend.so.1` != "$<" ]; then \
+		echo using $<; \
+		ln -sf $< libfrontend.so.1; \
+		rm -f ../coeditor 2> /dev/null; \
+	else \
+		echo no change; \
+	fi
 
 use-curses : ${FRONT_END_CURSES_LIB}
-	ln -sf $< libfrontend.so.1
+	@ if [ `readlink libfrontend.so.1` != "$<" ]; then \
+		echo using $<; \
+		ln -sf $< libfrontend.so.1; \
+		rm -f ../coeditor 2> /dev/null; \
+	else \
+		echo no change; \
+	fi
 
 ${FRONT_END_CLI_LIB} : front_end.o front_end_cli.o
 	${CXX} ${FRONT_END_CXXFLAGS} -o $@ $^

@@ -110,6 +110,7 @@ prompt_t textOp::deleteChar(pos_t pos) {
     assert(cerr << "Deleting (" << pos.lineno << ", " 
                 << pos.offset << ")\n");
     auto it = locateLine(pos.lineno);
+    assert(cerr << "└─before del: " << it->line << endl);
     if (it == edit_file.end() || it->line.size() < pos.offset
         || pos.offset < 0)
     {
@@ -135,6 +136,7 @@ prompt_t textOp::deleteChar(pos_t pos) {
         it->line.erase(it->line.begin() + (pos.offset - 1));
     }
     modified = true;
+    assert(cerr << "└─after  del: " << it->line << endl);
     return NOERR;
 }
 
@@ -152,6 +154,7 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
     cerr << "' into (" << pos.lineno << ", " << pos.offset << ")\n";
     #endif
     auto it = locateLine(pos.lineno);
+    assert(cerr << "└─before ins: " << it->line << endl);
     if (it == edit_file.end() || it->line.size() + 1 < pos.offset
         || pos.offset < 1)
     {
@@ -167,12 +170,14 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
         else if (pos.offset == it->line.size()) {
             linestruct next_blank_line;
             edit_file.insert(++it, next_blank_line);
+            --it;
         }
         else {
             linestruct next_line;
             next_line.line = it->line.substr(pos.offset - 1);
             it->line.resize(pos.offset - 1);
             edit_file.insert(++it, next_line);
+            --it;
         }
         ++total_lines;
         ++cur_line_no;
@@ -183,6 +188,7 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
         it->line.insert(pos.offset - 1, tmpbuf);
     }
     modified = true;
+    assert(cerr << "└─after  ins: " << it->line << endl);
     return NOERR;
 }
 
@@ -218,42 +224,4 @@ prompt_t textOp::saveFile(const string &filename) {
     }
     assert(cerr << "done\n");
     return NOERR;
-}
-
-extern "C" {
-
-/* init the editing file */
-prompt_t loadFile(textOp &file, const string &filename) {
-    return file.loadFile(filename);
-}
-
-/* print buf for debug */
-void printLines(textOp &file, int start, int count) {
-    file.printLines(start, count);
-}
-
-/* delete a character, if offset is 0, will join a line */
-prompt_t deleteChar(textOp &file, pos_t pos) {
-    return file.deleteChar(pos);
-}
-
-/* insert a character, if it is a newline, will add a line */
-prompt_t insertChar(textOp &file, pos_t pos, char c) {
-    return file.insertChar(pos, c);
-}
-
-/* save file */
-prompt_t saveToFile(textOp &file, const string &filename) {
-    return file.saveFile(filename);
-}
-
-prompt_t saveCurFile(textOp &file) {
-    return file.saveFile();
-}
-
-/* get file name */
-string getFilename(textOp &file) {
-    return file.getFilename();
-}
-
 }
