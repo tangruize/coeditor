@@ -9,6 +9,7 @@
 #include "common.h"
 #include "front_end.h"
 #include "op.h"
+#include "error.h"
 #include <unistd.h>
 
 /* using dynamic linking, C linkage is preferred */
@@ -17,9 +18,6 @@ extern "C" {
 #define DEFAULT_PS ">> "
 static string ps = DEFAULT_PS;
 
-const char *front_end_version = "CLI 0.1";
-const char *front_end_author = "Ruize Tang";
-
 static inline void shellPrompt() {
     if (isatty(STDERR_FILENO)) {
         write(STDERR_FILENO, ps.c_str(), ps.size());
@@ -27,10 +25,10 @@ static inline void shellPrompt() {
 }
 
 /* the front-end function */
-void frontEnd(textOp &file) {
+void frontEndCli(textOp &file, istream &in) {
     string line, cmd, data;
     op_t op;
-    for (shellPrompt(); getline(cin, line); shellPrompt()) {
+    for (shellPrompt(); getline(in, line); shellPrompt()) {
         if (line.size() == 0) {
             continue;
         }
@@ -43,7 +41,7 @@ void frontEnd(textOp &file) {
                                 || op.pos.lineno == -1) 
                                 && cmd[0] != SAVE && cmd[0] != PRINT))
         {
-            errMsg("frontEnd: syntax error: " + line);
+            errMsg("frontEndCli syntax error: " + line);
             continue;
         }
         op.operation = cmd[0];
@@ -51,14 +49,14 @@ void frontEnd(textOp &file) {
         switch (op.operation) {
             case DELETE: {
                 msg = file.deleteChar(op.pos);
-                PROMT_ERROR(msg);
+                PROMPT_ERROR(msg);
                 break;
             }
             case INSERT: {
                 if (!data.size() 
                     || (data[0] != '\\' && data.size() != 1)) 
                 {
-                    errMsg("frontEnd: syntax error: " + line);
+                    errMsg("frontEndCli syntax error: " + line);
                     continue;
                 }
                 if (data[0] == '\\' && data.size() == 2) {
@@ -66,7 +64,7 @@ void frontEnd(textOp &file) {
                     const static char *raw = "\a\b\f\n\r\t\v";
                     const char *pos = strchr(esc, data[1]);
                     if (pos == NULL) {
-                        errMsg("frontEnd: No such escaped character: "
+                        errMsg("frontEndCli No such escaped character: "
                                + data);
                         continue;
                     }
@@ -75,7 +73,7 @@ void frontEnd(textOp &file) {
                 }
                 op.data = data[0];
                 msg = file.insertChar(op.pos, (char)op.data);
-                PROMT_ERROR(msg);
+                PROMPT_ERROR(msg);
                 break;
             }
             case PRINT: {
@@ -89,11 +87,11 @@ void frontEnd(textOp &file) {
                 stringstream ss2(line);
                 ss2 >> cmd >> data;
                 msg = file.saveFile(data);
-                PROMT_ERROR(msg);
+                PROMPT_ERROR(msg);
                 break;
             }
             default: {
-                errMsg("frontEnd: no such operation '" + cmd + "'");
+                errMsg("frontEndCli: no such operation '" + cmd + "'");
             }
         }
     }

@@ -9,6 +9,8 @@
 #ifndef _OP_H
 #define _OP_H
 
+#include <stdint.h>
+
 /* (line, offset), both should be greater than 0 */
 struct pos_t {
     int lineno;
@@ -19,7 +21,10 @@ struct pos_t {
 struct op_t {
     int operation;
     int data;
-    pos_t pos;
+    union {
+        pos_t pos;
+        uint64_t char_offset;
+    };
 };
 
 /* enum some operations */

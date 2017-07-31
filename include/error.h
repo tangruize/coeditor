@@ -22,6 +22,7 @@
 #endif /* DEBUG */
 
 #include <cassert>
+#include <errno.h>
 
 /* return value for some functions, to inform an error */
 typedef const string prompt_t;
@@ -40,7 +41,8 @@ void _err(prompt_t &errmsg, bool term, int lineno);
 
 #define errExit(msg) _err(msg, true, __LINE__)
 #define errMsg(msg) _err(msg, false, __LINE__)
-#define PROMT_ERROR(msg) do { \
+
+#define PROMPT_ERROR(msg) do { \
         if (msg != NOERR) { \
             errMsg(msg); \
         } \
@@ -49,6 +51,15 @@ void _err(prompt_t &errmsg, bool term, int lineno);
 #define EXIT_ERROR(msg) do { \
         if (msg != NOERR) { \
             errExit(msg); \
+        } \
+    } while(0)
+
+#define PROMPT_ERROR_EN(msg) do { \
+        int saved_errno = errno; \
+        std::string msg_en = string(msg) + string(": ") \
+                             + strerror(saved_errno); \
+        if (msg_en != NOERR) { \
+            errMsg(msg_en); \
         } \
     } while(0)
 

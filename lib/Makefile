@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-LIBS = libfrontend.so
+LIBS = libfrontend.so.1
 
 SRC = $(wildcard *.cpp)
 
@@ -8,50 +8,54 @@ FRONT_END_CLI_LIB = libfrontend.so.1.0.1
 
 FRONT_END_CURSES_LIB = libfrontend.so.1.1.1
 
-FRONT_END = ${FRONT_END_CURSES_LIB}
+FRONT_END_STATIC_DEFAULT = libfrontend.a.1.1.1
+
+FRONT_END_DEFAULT = ${FRONT_END_CURSES_LIB}
 
 FRONT_END_CXXFLAGS := ${CXXFLAGS} -shared \
 				 -Wl,-soname,libfrontend.so.1 \
-				 -Wl,-efront_end_main \
-				 -Wl,--version-script,front_end_version.map
+				 -Wl,-efrontEndMain
 
 CXXFLAGS += -fPIC
 
 all : ${LIBS}
 
-# Because of C++ name mangling, and our shared libraries use external code,
-# dynamic linker probably cannot find the symbol if using another version,
-# to avoid this problem, we must remove ELF file and re-link.
-# Yes, it is due to the poor design (shared libraries using external code).
+static : ${LIBS}
+
 use-cli : ${FRONT_END_CLI_LIB}
-	@ if [ `readlink libfrontend.so.1` != "$<" ]; then \
+	@ libname=`readlink libfrontend.so.1`; \
+		if [ $${libname:-"NULL"} != "$<" ]; then \
 		echo using $<; \
 		ln -sf $< libfrontend.so.1; \
+		ln -sf libfrontend.a.1.0.1 libfrontend.a; \
 		rm -f ../coeditor 2> /dev/null; \
 	else \
 		echo no change; \
 	fi
 
 use-curses : ${FRONT_END_CURSES_LIB}
-	@ if [ `readlink libfrontend.so.1` != "$<" ]; then \
+	@ libname=`readlink libfrontend.so.1`; \
+		if [ $${libname:-"NULL"} != "$<" ]; then \
 		echo using $<; \
 		ln -sf $< libfrontend.so.1; \
-		rm -f ../coeditor 2> /dev/null; \
+		ln -sf libfrontend.a.1.1.1 libfrontend.a; \
 	else \
 		echo no change; \
 	fi
 
-${FRONT_END_CLI_LIB} : front_end.o front_end_cli.o
-	${CXX} ${FRONT_END_CXXFLAGS} -o $@ $^
+${FRONT_END_CLI_LIB} : front_end_v1.o front_end_cli.o
+	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version1.map -o $@ $^
+	ar r libfrontend.a.1.0.1 $^
 
-${FRONT_END_CURSES_LIB} : front_end.o front_end_curses.o
-	${CXX} ${FRONT_END_CXXFLAGS} -o $@ $^ -lncurses
+${FRONT_END_CURSES_LIB} : front_end_v2.o front_end_cli.o front_end_curses.o
+	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version2.map -o $@ $^ -lncurses
+	ar r libfrontend.a.1.1.1 $^
 
-libfrontend.so.1 : ${FRONT_END}
-	ln -sf $< $@
-
-libfrontend.so : libfrontend.so.1
-	ln -sf $< $@
+libfrontend.so.1 : ${FRONT_END_CLI_LIB} ${FRONT_END_CURSES_LIB}
+	-ln -s ${FRONT_END_DEFAULT} $@ 2> /dev/null
+	-ln -s ${FRONT_END_STATIC_DEFAULT} libfrontend.a 2> /dev/null
+	-ln -s libfrontend.so.1 libfrontend.so 2> /dev/null
+	touch $@ libfrontend.a
 
 %.d: %.cpp
 	@set -e; rm -f $@; \
@@ -62,4 +66,4 @@ libfrontend.so : libfrontend.so.1
 -include $(SRC:.cpp=.d)
 
 clean :
-	${RM} ${LIBS} *.o *.so.* *.d *.d.*
+	${RM} ${LIBS} *.o *.so *.so.* *.d *.d.* *.a *.a.*

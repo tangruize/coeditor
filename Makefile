@@ -6,10 +6,13 @@ DIRS = lib src
 
 BUILD_DIRS = ${DIRS}
 
-#Dummy targets for building and clobbering everything in all subdirectories
+# Dummy targets for building and clobbering everything in all subdirectories
 
 all:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE}) ; done
+
+static:
+	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} static) ; done
 
 clean:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} clean) ; done

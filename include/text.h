@@ -23,18 +23,13 @@ typedef list<linestruct> file_t;
 
 class textOp {
 public:
-    textOp(const string &filename = "") {
-        if (filename.size()) {
-            auto msg = loadFile(filename);
-            if (msg != NOERR) {
-                throw msg;
-            }
-        }
-        modified = false;
-    }
+    textOp(const string &filename = "");
 
     /* init the editing file */
     prompt_t loadFile(const string &filename);
+
+    /* locate at a given line */
+    file_t::iterator locateLine(int no);
 
     /* print buf for debug */
     void printLines(int start = 1, int count = -1, bool lineno = true);
@@ -45,12 +40,63 @@ public:
     /* insert a character, if it is a newline, will add a line */
     prompt_t insertChar(pos_t pos, char c);
 
+    /* delete a character at given file offset */
+    prompt_t deleteCharAt(uint64_t off);
+
+    /* insert a character at given file offset */
+    prompt_t insertCharAt(uint64_t off, char c);
+
     /* save file */
-    prompt_t saveFile(const string &filename = "");
+    prompt_t saveFile(const string &filename = "",
+            ios_base::openmode mode = ios::out);
+
+    /* translate (row, col) to file offset */
+    uint64_t translatePos(const pos_t pos);
+
+    /* translate file offset to (row, col) */
+    pos_t translateOffset(uint64_t offset);
 
     /* get file name */
     string getFilename() const {
         return file_name;
+    }
+
+    /* get total lines */
+    int getTotalLines() const {
+        return edit_file.size();
+    }
+
+    /* get file size */
+    int getTotalChars() const {
+        return total_chars;
+    }
+
+    /* file is modified? */
+    bool isModified() const {
+        return modified;
+    }
+
+    /* set file name */
+    void setFilename(const string &filename) {
+        file_name = filename;
+    }
+
+    /* clear modified state */
+    void clearModified() {
+        modified = false;
+    }
+
+    /* set modified state */
+    void setModified() {
+        modified = true;
+    }
+
+    /* if file has no break line, 
+     * getTotalLines() == real total lines - 1
+     * Note that it is meaningless if modified
+     */
+    bool hasBreakLine() const {
+        return has_break_line;
     }
 
 private:
@@ -60,18 +106,19 @@ private:
     /* file name for saving */
     string file_name;
 
-    /* total lines of the editing file */
-    int total_lines;
-
     /* is file modified? */
     bool modified;
 
-    /* current line iterator and line num */
-    int cur_line_no;
-    file_t::iterator cur_line_it;
+    /* is the last line a break line? */
+    bool has_break_line;
 
-    /* locate at a given line */
-    file_t::iterator locateLine(int no);
+    /* current line iterator, line num and current line start offset */
+    file_t::iterator cur_line_it;
+    int cur_line_no;
+    uint64_t cur_char;
+
+    /* total characters */
+    uint64_t total_chars;
 };
 
 #endif

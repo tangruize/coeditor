@@ -12,7 +12,6 @@
 #include "text.h"
 
 extern "C" void frontEnd(textOp &file);
-extern "C" void printFrontEndBanner();
 extern "C" const char *front_end_version;
 extern "C" const char *front_end_author;
 

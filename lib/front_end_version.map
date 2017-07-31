@@ -1,9 +1,0 @@
-VER_1 {
-    global:
-        frontEnd;
-        printFrontEndBanner;
-        front_end_version;
-        front_end_author;
-    local:
-        *;    # Hide all other symbols
-};

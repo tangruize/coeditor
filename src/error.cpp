@@ -9,17 +9,15 @@
 #include "error.h"
 
 /* program name for error prompt */
-const char *program_name = "";
+extern char *program_invocation_name;
 
 /* prompt an error with prefix 'PROG:FILE:LINE: '
  * if term is 'true', terminate with status EXIT_FAILURE
  * term and lineno are encapsulated by macro, see header
  */
 void _err(prompt_t &errmsg, bool term, int lineno) {
-    if (strcmp(program_name, "") != 0) {
-        cerr << program_name << ":";
-    }
-    cerr << __FILE__ << ":" << lineno << ":" << errmsg << endl;
+    cerr << program_invocation_name << ":" << __FILE__ << ":"
+         << lineno << ":" << errmsg << endl;
     if (term) {
         exit(EXIT_FAILURE);
     }

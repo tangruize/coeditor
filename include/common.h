@@ -18,9 +18,16 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <cstdlib>
-#include <cctype>
-#include <cstring>
+
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
+#include <limits.h>
 
 using namespace std;
 

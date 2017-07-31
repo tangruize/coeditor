@@ -7,16 +7,16 @@
 
 #include "text.h"
 #include "error.h"
+#include "init.h"
 #include "front_end.h"
 
 int main(int argc, char *argv[]) {
-    program_name = argv[0];
-    if (argc < 2) {
-        errExit("main: Too few arguments");
-    }
     textOp file;
-    auto msg = file.loadFile(argv[1]);
-    EXIT_ERROR(msg);
+    edit_file = &file;
+    if (argc > 1) {
+        auto msg = file.loadFile(argv[1]);
+    }
+    init();
     frontEnd(file);
     return 0;
 }
