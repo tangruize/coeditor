@@ -28,6 +28,9 @@ struct op_t {
 };
 
 /* enum some operations */
-enum {DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's'};
+enum {
+    DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's',
+    CH_DELETE = 'D', CH_INSERT = 'I'
+};
 
 #endif

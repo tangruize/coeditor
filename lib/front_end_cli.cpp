@@ -10,10 +10,14 @@
 #include "front_end.h"
 #include "op.h"
 #include "error.h"
+#include "init.h"
 #include <unistd.h>
 
 /* using dynamic linking, C linkage is preferred */
 extern "C" {
+
+extern volatile int buf_changed;
+extern int write_op;
 
 #define DEFAULT_PS ">> "
 static string ps = DEFAULT_PS;
@@ -27,7 +31,8 @@ static inline void shellPrompt() {
 /* the front-end function */
 void frontEndCli(textOp &file, istream &in) {
     string line, cmd, data;
-    op_t op;
+    op_t op, saved_op;
+    char delete_char;
     for (shellPrompt(); getline(in, line); shellPrompt()) {
         if (line.size() == 0) {
             continue;
@@ -36,27 +41,62 @@ void frontEndCli(textOp &file, istream &in) {
         cmd.clear();
         data.clear();
         memset(&op, -1, sizeof(op));
-        ss >> cmd >> op.pos.lineno >> op.pos.offset >> data;
-        if (cmd.size() != 1 || ((data.size() > 2 
-                                || op.pos.lineno == -1) 
-                                && cmd[0] != SAVE && cmd[0] != PRINT))
+        uint64_t offset = (uint64_t)-1;
+        ss >> cmd;
+        if (cmd.size() && isupper(cmd[0])) {
+            ss >> offset >> data;
+        }
+        else {
+            ss >> op.pos.lineno >> op.pos.offset >> data;
+        }
+        if (cmd.size() != 1 || ((data.size() > 2
+            || (op.pos.lineno == -1 && offset == (uint64_t)-1))
+            && cmd[0] != SAVE && cmd[0] != PRINT))
         {
-            errMsg("frontEndCli syntax error: " + line);
+            errMsg("frontEndCli: syntax error: " + line);
             continue;
         }
         op.operation = cmd[0];
         string msg;
+        saved_op = op;
         switch (op.operation) {
-            case DELETE: {
-                msg = file.deleteChar(op.pos);
+            case CH_DELETE:
+                msg = file.deleteCharAt(offset, &delete_char);
                 PROMPT_ERROR(msg);
+                if (msg == NOERR) {
+                    op.data = delete_char;
+                    op.char_offset = offset;
+                    buf_changed = 1;
+                    if (write_op) {
+                        writeOpFifo(op);
+                    }
+                }
+                break;
+            case DELETE: {
+                msg = file.deleteChar(op.pos, &delete_char);
+                PROMPT_ERROR(msg);
+                if (msg == NOERR) {
+                    op.data = delete_char;
+                    buf_changed = 1;
+                    if (write_op) {
+                        writeOpFifo(op);
+                    }
+                }
                 break;
             }
+            case CH_INSERT:
+                op.pos = file.translateOffset(offset);
+                saved_op.char_offset = offset;
+                if (op.pos.lineno < 1) {
+                    PROMPT_ERROR("translateOffset: offset out of range "
+                                 + to_string(offset));
+                    break;
+                }
             case INSERT: {
                 if (!data.size() 
                     || (data[0] != '\\' && data.size() != 1)) 
                 {
-                    errMsg("frontEndCli syntax error: " + line);
+                    errMsg("frontEndCli: syntax error: " + line);
                     continue;
                 }
                 if (data[0] == '\\' && data.size() == 2) {
@@ -64,7 +104,7 @@ void frontEndCli(textOp &file, istream &in) {
                     const static char *raw = "\a\b\f\n\r\t\v";
                     const char *pos = strchr(esc, data[1]);
                     if (pos == NULL) {
-                        errMsg("frontEndCli No such escaped character: "
+                        errMsg("frontEndCli: No such escaped character: "
                                + data);
                         continue;
                     }
@@ -72,8 +112,15 @@ void frontEndCli(textOp &file, istream &in) {
                                 - (unsigned long)esc + raw);
                 }
                 op.data = data[0];
+                saved_op.data = data[0];
                 msg = file.insertChar(op.pos, (char)op.data);
                 PROMPT_ERROR(msg);
+                if (msg == NOERR) {
+                    buf_changed = 1;
+                    if (write_op) {
+                        writeOpFifo(saved_op);
+                    }
+                }
                 break;
             }
             case PRINT: {
@@ -88,6 +135,7 @@ void frontEndCli(textOp &file, istream &in) {
                 ss2 >> cmd >> data;
                 msg = file.saveFile(data);
                 PROMPT_ERROR(msg);
+                buf_changed = 1;
                 break;
             }
             default: {

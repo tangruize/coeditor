@@ -2,7 +2,7 @@
 # (The library directory is first so that the library gets built first)
 #
 
-DIRS = lib src
+DIRS = lib src server
 
 BUILD_DIRS = ${DIRS}
 
@@ -18,12 +18,12 @@ clean:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} clean) ; done
 
 pre-use-cli:
-	@ cd lib; ${MAKE} use-cli
+	@ cd lib; ${MAKE} cli
 
 pre-use-curses:
-	@ cd lib; ${MAKE} use-curses
+	@ cd lib; ${MAKE} curses
 
-use-cli: pre-use-cli all
+cli: pre-use-cli all
 
-use-curses: pre-use-curses all
+curses: pre-use-curses all
 

@@ -220,7 +220,7 @@ pos_t textOp::translateOffset(uint64_t offset) {
 }
 
 /* delete a character, if offset is 0, will join a line */
-prompt_t textOp::deleteChar(pos_t pos) {
+prompt_t textOp::deleteChar(pos_t pos, char *c) {
     assert(cerr << "Deleting (" << pos.lineno << ", " 
                 << pos.offset << ")\n");
     assert(cerr << "---Locating line " << pos.lineno << '\n');
@@ -233,9 +233,13 @@ prompt_t textOp::deleteChar(pos_t pos) {
                + to_string(pos.lineno) + ", " 
                + to_string(pos.offset) + ")";
     }
-    assert(cerr << "---before del: " << it->line << endl);
+    char delete_char;
     --total_chars;
+    assert(cerr << "---delete char: '");
     if (pos.offset == 0) {
+        delete_char = '\n';
+        assert(cerr << "\\n'\n" << "---before del: "
+               << it->line << endl);
         file_t::iterator to_join = it;
         --it;
         cur_char -= it->line.size() + 1;
@@ -245,7 +249,21 @@ prompt_t textOp::deleteChar(pos_t pos) {
         edit_file.erase(to_join);
     }
     else {
+        delete_char = it->line[pos.offset - 1];
+        #ifndef NDEBUG
+        if (isprint(delete_char)) {
+            cerr << delete_char;
+        }
+        else {
+            cerr << "0x" << hex << uppercase << (unsigned)delete_char;
+            cerr.unsetf(ios_base::hex);
+        }
+        #endif
+        assert(cerr << "'\n" << "---before del: " << it->line << endl);
         it->line.erase(it->line.begin() + (pos.offset - 1));
+    }
+    if (c) {
+        *c = delete_char;
     }
     modified = true;
     assert(cerr << "---after  del: " << it->line << endl);
@@ -317,12 +335,12 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
 }
 
 /* delete a character at given file offset */
-prompt_t textOp::deleteCharAt(uint64_t off) {
+prompt_t textOp::deleteCharAt(uint64_t off, char *c) {
     pos_t pos = translateOffset(off);
     if (pos.lineno < 1) {
         return "deleteCharAt: offset out of range: " + to_string(off);
     }
-    return deleteChar(pos);
+    return deleteChar(pos, c);
 }
 
 /* insert a character at given file offset */
@@ -358,6 +376,7 @@ prompt_t textOp::saveFile(const string &filename,
         outfile.open(filename.c_str(), mode);
     }
     if (!outfile.is_open()) {
+        assert(cerr << "failed\n\n");
         return "Error saving " + filename + ": cannot open file";
     }
     int i = 0, sz = (int)edit_file.size() - 1;

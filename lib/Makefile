@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-LIBS = libfrontend.so.1
+LIBS = libfrontend.so.1 libinetsockets.so
 
 SRC = $(wildcard *.cpp)
 
@@ -22,7 +22,7 @@ all : ${LIBS}
 
 static : ${LIBS}
 
-use-cli : ${FRONT_END_CLI_LIB}
+cli : ${FRONT_END_CLI_LIB}
 	@ libname=`readlink libfrontend.so.1`; \
 		if [ $${libname:-"NULL"} != "$<" ]; then \
 		echo using $<; \
@@ -33,7 +33,7 @@ use-cli : ${FRONT_END_CLI_LIB}
 		echo no change; \
 	fi
 
-use-curses : ${FRONT_END_CURSES_LIB}
+curses : ${FRONT_END_CURSES_LIB}
 	@ libname=`readlink libfrontend.so.1`; \
 		if [ $${libname:-"NULL"} != "$<" ]; then \
 		echo using $<; \
@@ -48,14 +48,18 @@ ${FRONT_END_CLI_LIB} : front_end_v1.o front_end_cli.o
 	ar r libfrontend.a.1.0.1 $^
 
 ${FRONT_END_CURSES_LIB} : front_end_v2.o front_end_cli.o front_end_curses.o
-	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version2.map -o $@ $^ -lncurses
+	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version2.map -o $@ $^ -lncurses -pthread
 	ar r libfrontend.a.1.1.1 $^
 
 libfrontend.so.1 : ${FRONT_END_CLI_LIB} ${FRONT_END_CURSES_LIB}
 	-ln -s ${FRONT_END_DEFAULT} $@ 2> /dev/null
 	-ln -s ${FRONT_END_STATIC_DEFAULT} libfrontend.a 2> /dev/null
 	-ln -s libfrontend.so.1 libfrontend.so 2> /dev/null
-	touch $@ libfrontend.a
+	touch -c $@ libfrontend.a
+
+libinetsockets.so : inet_sockets.o
+	${CXX} ${CXXFLAGS} -shared -o $@ $^
+	ar r libinetsockets.a $^
 
 %.d: %.cpp
 	@set -e; rm -f $@; \

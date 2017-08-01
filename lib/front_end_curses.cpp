@@ -25,6 +25,10 @@
 
 #define VERSION "1.1"
 
+extern pthread_t main_thread_id;
+extern volatile int buf_changed;
+extern int write_op_pos;
+
 /* least window size */
 #define MIN_COL 10
 #define MIN_ROW 10
@@ -793,7 +797,8 @@ void suspendEditor() {
     endwin();
     cout << "Use \"fg\" to return to Coeditor." << endl;
     /* terminal stop signal */
-    raise(SIGTSTP);
+    //raise(SIGTSTP);
+    pthread_kill(pthread_self(), SIGTSTP);
     reset_prog_mode();
     redraw(RD_ALL);
 }
@@ -994,11 +999,13 @@ retry:
                 goto retry;
             }
         }
-        if (editing_file->getFilename() == "") {
+        int ret = writeAndShowMsg(s, "Wrote ");
+        if (ret == 0 && editing_file->getFilename() == "") {
             /* new file */
             editing_file->setFilename(s);
+            editing_file->clearModified();
         }
-        return writeAndShowMsg(s, "Wrote ");
+        return ret;
     }
     else {
         /* prepend or append */
@@ -1131,7 +1138,25 @@ int exitEditor() {
 
 /* insert */
 void insertChar(int ch) {
-    editing_file->insertChar(cur_pos, ch);
+    uint64_t off = (uint64_t)-1;
+    if (!write_op_pos) {
+       off = editing_file->translatePos(cur_pos);
+    }
+    if (editing_file->insertChar(cur_pos, ch) == NOERR) {
+        op_t op;
+        if (write_op_pos) {
+            op.pos = cur_pos;
+            op.data = ch;
+            op.operation = INSERT;
+            writeOpFifo(op);
+        }
+        else if (off != (uint64_t)-1) {
+            op.char_offset = off;
+            op.data = ch;
+            op.operation = CH_INSERT;
+            writeOpFifo(op);
+        }
+    }
     if (ch == '\n') {
         cur_pos.offset = 1;
         if (screen_line >= LINES - STATUS_LINES - 1) {
@@ -1150,9 +1175,18 @@ void insertChar(int ch) {
 
 /* delete predecessor */
 void keyBackspace() {
+    uint64_t off = (uint64_t)-1;
+    char ch = 0;
+    string del_result;
+    if (!write_op_pos) {
+       off = editing_file->translatePos(cur_pos);
+       if (off != (uint64_t)-1) {
+           off -= 1;
+       }
+    }
+    pos_t saved_pos = cur_pos;
     if (cur_pos.offset <= 1) {
         if (cur_pos.lineno > 1) {
-            pos_t saved_pos = cur_pos;
             cur_pos.offset = INT_MAX;
             if (screen_line <= TITLE_LINES) {
                 keyUp();
@@ -1162,32 +1196,75 @@ void keyBackspace() {
                 redraw();
             }
             --saved_pos.offset;
-            editing_file->deleteChar(saved_pos);
+            del_result = editing_file->deleteChar(saved_pos, &ch);
             redraw();
         }
         else {
             cur_pos.offset = 1;
+            return;
         }
     }
     else {
         --cur_pos.offset;
-        editing_file->deleteChar(cur_pos);
+        saved_pos = cur_pos;
+        del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
+    }
+    op_t op;
+    if (del_result == NOERR) {
+        if (write_op_pos) {
+            op.pos = saved_pos;
+            op.data = ch;
+            op.operation = DELETE;
+            writeOpFifo(op);
+        }
+        else if (off != (uint64_t)-1) {
+            op.char_offset = off;
+            op.data = ch;
+            op.operation = CH_DELETE;
+            writeOpFifo(op);
+        }
     }
 }
 
 /* delete cur char */
 void keyDelete() {
+    uint64_t off = (uint64_t)-1;
+    char ch = 0;
+    string del_result;
+    if (!write_op_pos) {
+       off = editing_file->translatePos(cur_pos);
+    }
+    pos_t saved_pos = cur_pos;
     if (cur_pos.offset <= cur_line_size) {
-        editing_file->deleteChar(cur_pos);
+        del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
     }
     else if (cur_pos.lineno < editing_file->getTotalLines()) {
         pos_t del_pos = cur_pos;
         ++del_pos.lineno;
         del_pos.offset = 0;
-        editing_file->deleteChar(del_pos);
+        saved_pos = del_pos;
+        del_result = editing_file->deleteChar(del_pos, &ch);
         redraw();
+    }
+    else {
+        return;
+    }
+    op_t op;
+    if (del_result == NOERR) {
+        if (write_op_pos) {
+            op.pos = saved_pos;
+            op.data = ch;
+            op.operation = DELETE;
+            writeOpFifo(op);
+        }
+        else if (off != (uint64_t)-1) {
+            op.char_offset = off;
+            op.data = ch;
+            op.operation = CH_DELETE;
+            writeOpFifo(op);
+        }
     }
 }
 
@@ -1448,7 +1525,7 @@ void getHelp() {
 void control() {
     int ch;
     mousemask(BUTTON1_PRESSED, NULL);
-    mouseinterval(0);
+    //mouseinterval(0);
     /* test key codes */
     /*
     int i = 0;
@@ -1490,7 +1567,16 @@ void control() {
     string call_result;
     while (true) {
         setTitleModifiedFlag();
+        timeout(100);
         ch = getch();
+        timeout(-1);
+        if (buf_changed) {
+            buf_changed = 0;
+            redraw();
+        }
+        if (ch == ERR) {
+            continue;
+        }
         drawStatusMsg();
         switch(ch) {
             case KEY_UP:
@@ -1605,8 +1691,5 @@ void control() {
 extern "C" void frontEndCurses(textOp &file) {
     editing_file = &file;
     initCurses();
-#ifdef DEBUG
-    redirectStderr();
-#endif
     control();
 }

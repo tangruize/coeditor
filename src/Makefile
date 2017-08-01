@@ -19,10 +19,10 @@ all : ${EXE}
 static : ${EXE_STATIC}
 
 ${EXE} : main.o ${LIBS} $(SRC_NO_MAIN:.cpp=.o)
-	${CXX} ${CXXFLAGS} -Wl,-rpath,'$$ORIGIN'/lib -o $@ $^
+	${CXX} ${CXXFLAGS} -Wl,-rpath,'$$ORIGIN'/lib -o $@ $^ -pthread
 
 ${EXE_STATIC} : main.o ${LIBS_STATIC} $(SRC_NO_MAIN:.cpp=.o)
-	${CXX} ${CXXFLAGS} -o $@ $^ -lncurses
+	${CXX} ${CXXFLAGS} -o $@ $^ -lncurses -pthread
 
 %.d: %.cpp
 	@set -e; rm -f $@; \
