@@ -2,7 +2,7 @@
 # (The library directory is first so that the library gets built first)
 #
 
-DIRS = lib src server
+DIRS = lib server src
 
 BUILD_DIRS = ${DIRS}
 

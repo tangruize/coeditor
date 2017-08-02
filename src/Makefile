@@ -2,7 +2,7 @@ include ../Makefile.inc
 
 SRC = $(wildcard *.cpp)
 
-SRC_NO_MAIN = $(shell find . -type f -name '*.cpp' ! -name main.cpp)
+SRC_NO_MAIN = $(shell find . -type f -name '*.cpp' ! -name main.cpp ! -name init.cpp)
 
 EXE = ../coeditor
 
@@ -18,10 +18,12 @@ all : ${EXE}
 
 static : ${EXE_STATIC}
 
-${EXE} : main.o ${LIBS} $(SRC_NO_MAIN:.cpp=.o)
+${EXE} : main.o init.o ${LIBS} $(SRC_NO_MAIN:.cpp=.o)
+#${EXE} : $(SRC:.cpp=.o) ${LIBS}
 	${CXX} ${CXXFLAGS} -Wl,-rpath,'$$ORIGIN'/lib -o $@ $^ -pthread
 
-${EXE_STATIC} : main.o ${LIBS_STATIC} $(SRC_NO_MAIN:.cpp=.o)
+#${EXE_STATIC} : main.o ${LIBS_STATIC} $(SRC_NO_MAIN:.cpp=.o)
+${EXE_STATIC} : $(SRC:.cpp=.o) ${LIBS_STATIC}
 	${CXX} ${CXXFLAGS} -o $@ $^ -lncurses -pthread
 
 %.d: %.cpp

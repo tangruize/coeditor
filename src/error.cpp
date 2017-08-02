@@ -15,8 +15,8 @@ extern char *program_invocation_name;
  * if term is 'true', terminate with status EXIT_FAILURE
  * term and lineno are encapsulated by macro, see header
  */
-void _err(prompt_t &errmsg, bool term, int lineno) {
-    cerr << program_invocation_name << ":" << __FILE__ << ":"
+void _err(prompt_t &errmsg, bool term, int lineno, const char *file) {
+    cerr << program_invocation_name << ":" << file << ":"
          << lineno << ":" << errmsg << endl;
     if (term) {
         exit(EXIT_FAILURE);

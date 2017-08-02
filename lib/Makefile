@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-LIBS = libfrontend.so.1 libinetsockets.so
+LIBS = libfrontend.so.1 libinetsockets.so.1
 
 SRC = $(wildcard *.cpp)
 
@@ -15,6 +15,9 @@ FRONT_END_DEFAULT = ${FRONT_END_CURSES_LIB}
 FRONT_END_CXXFLAGS := ${CXXFLAGS} -shared \
 				 -Wl,-soname,libfrontend.so.1 \
 				 -Wl,-efrontEndMain
+
+INET_CXXFLAGS := ${CXXFLAGS} -shared \
+				-Wl,-soname,libinetsockets.so.1
 
 CXXFLAGS += -fPIC
 
@@ -54,11 +57,13 @@ ${FRONT_END_CURSES_LIB} : front_end_v2.o front_end_cli.o front_end_curses.o
 libfrontend.so.1 : ${FRONT_END_CLI_LIB} ${FRONT_END_CURSES_LIB}
 	-ln -s ${FRONT_END_DEFAULT} $@ 2> /dev/null
 	-ln -s ${FRONT_END_STATIC_DEFAULT} libfrontend.a 2> /dev/null
-	-ln -s libfrontend.so.1 libfrontend.so 2> /dev/null
+	-ln -s $@ libfrontend.so 2> /dev/null
 	touch -c $@ libfrontend.a
 
-libinetsockets.so : inet_sockets.o
-	${CXX} ${CXXFLAGS} -shared -o $@ $^
+libinetsockets.so.1 : inet_sockets.o rdwrn.o
+	${CXX} ${INET_CXXFLAGS} -o libinetsockets.so.1.0.1 $^
+	-ln -s libinetsockets.so.1.0.1 libinetsockets.so.1
+	-ln -s libinetsockets.so.1 libinetsockets.so
 	ar r libinetsockets.a $^
 
 %.d: %.cpp

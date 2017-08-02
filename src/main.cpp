@@ -5,16 +5,33 @@
 	> Creatation Time: 2017-07-24 17:48
  ************************************************************************/
 
-#include "text.h"
+#include "text_mutex.h"
 #include "error.h"
 #include "init.h"
 #include "front_end.h"
+#include "common.h"
+
+#include <unistd.h>
+
+string server_addr;
 
 int main(int argc, char *argv[]) {
-    textOp file;
+    int opt;
+    while ((opt = getopt(argc, argv, "c:")) != -1) {
+        switch (opt) {
+            case 'c':
+                server_addr = optarg;
+                break;
+            default:
+                cerr << "Invalid arguments" << endl;
+                exit(EXIT_FAILURE);
+        }
+    }
+    textOpMutex file;
     edit_file = &file;
-    if (argc > 1) {
-        auto msg = file.loadFile(argv[1]);
+    if (optind < argc) {
+        auto msg = file.loadFile(argv[optind]);
+        EXIT_ERROR(msg);
     }
     init();
     frontEnd(file);

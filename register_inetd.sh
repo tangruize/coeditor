@@ -1,0 +1,1 @@
+script/register_inetd.sh

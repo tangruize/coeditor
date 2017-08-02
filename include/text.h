@@ -35,16 +35,16 @@ public:
     void printLines(int start = 1, int count = -1, bool lineno = true);
 
     /* delete a character, if offset is 0, will join a line */
-    prompt_t deleteChar(pos_t pos, char *c = NULL);
+    virtual prompt_t deleteChar(pos_t pos, char *c = NULL);
 
     /* insert a character, if it is a newline, will add a line */
-    prompt_t insertChar(pos_t pos, char c);
+    virtual prompt_t insertChar(pos_t pos, char c);
 
     /* delete a character at given file offset */
-    prompt_t deleteCharAt(uint64_t off, char *c = NULL);
+    virtual prompt_t deleteCharAt(uint64_t off, char *c = NULL);
 
     /* insert a character at given file offset */
-    prompt_t insertCharAt(uint64_t off, char c);
+    virtual prompt_t insertCharAt(uint64_t off, char c);
 
     /* save file */
     prompt_t saveFile(const string &filename = "",

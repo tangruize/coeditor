@@ -37,10 +37,10 @@ extern const char *program_name;
  * if term is 'true', terminate with status EXIT_FAILURE
  * term and lineno are encapsulated by macro, see below
  */
-void _err(prompt_t &errmsg, bool term, int lineno);
+void _err(prompt_t &errmsg, bool term, int lineno, const char *file);
 
-#define errExit(msg) _err(msg, true, __LINE__)
-#define errMsg(msg) _err(msg, false, __LINE__)
+#define errExit(msg) _err(msg, true, __LINE__, __FILE__)
+#define errMsg(msg) _err(msg, false, __LINE__, __FILE__)
 
 #define PROMPT_ERROR(msg) do { \
         if (msg != NOERR) { \

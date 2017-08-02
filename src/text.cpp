@@ -172,7 +172,7 @@ uint64_t textOp::translatePos(const pos_t pos) {
     assert(cerr << "tanslating postion (" << pos.lineno << ", " <<
            pos.offset << ") ... ");
     file_t::iterator it = locateLine(pos.lineno);
-    if (it == edit_file.end() || pos.offset < 1
+    if (it == edit_file.end() || pos.offset < 0
         || pos.offset > it->line.size() + 1)
     {
         assert(cerr << "failed\n\n");

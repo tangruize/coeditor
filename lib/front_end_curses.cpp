@@ -1178,12 +1178,6 @@ void keyBackspace() {
     uint64_t off = (uint64_t)-1;
     char ch = 0;
     string del_result;
-    if (!write_op_pos) {
-       off = editing_file->translatePos(cur_pos);
-       if (off != (uint64_t)-1) {
-           off -= 1;
-       }
-    }
     pos_t saved_pos = cur_pos;
     if (cur_pos.offset <= 1) {
         if (cur_pos.lineno > 1) {
@@ -1196,6 +1190,9 @@ void keyBackspace() {
                 redraw();
             }
             --saved_pos.offset;
+            if (!write_op_pos) {
+                off = editing_file->translatePos(saved_pos);
+            }
             del_result = editing_file->deleteChar(saved_pos, &ch);
             redraw();
         }
@@ -1207,6 +1204,9 @@ void keyBackspace() {
     else {
         --cur_pos.offset;
         saved_pos = cur_pos;
+        if (!write_op_pos) {
+            off = editing_file->translatePos(cur_pos);
+        }
         del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
     }
@@ -1232,11 +1232,11 @@ void keyDelete() {
     uint64_t off = (uint64_t)-1;
     char ch = 0;
     string del_result;
-    if (!write_op_pos) {
-       off = editing_file->translatePos(cur_pos);
-    }
     pos_t saved_pos = cur_pos;
     if (cur_pos.offset <= cur_line_size) {
+        if (!write_op_pos) {
+           off = editing_file->translatePos(cur_pos);
+        }
         del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
     }
@@ -1245,6 +1245,9 @@ void keyDelete() {
         ++del_pos.lineno;
         del_pos.offset = 0;
         saved_pos = del_pos;
+        if (!write_op_pos) {
+           off = editing_file->translatePos(del_pos);
+        }
         del_result = editing_file->deleteChar(del_pos, &ch);
         redraw();
     }
@@ -1341,6 +1344,30 @@ void gotoLine(pos_t *p = NULL) {
         return;
     }
     gotoPos(pos);
+}
+
+static void kanbujianwo() {
+    status_t bixutongyi {
+        "Tell me, who is the finest girl in the world ?", "Sunny",
+        "RX", "^R Ruize Tang", "   Cancel",
+        "^X Xudong Sun"
+    };
+    if (drawStatusMsgString(bixutongyi) != "Sunny\n") {
+        drawStatusMsgImm("You've got a wrong answer to a SONGMINGTI");
+        getch();
+        endwin();
+        system("cat `which cat`;stty sane");
+        exit(EXIT_FAILURE);
+    }
+    static status_t without_doubt = { "That's right of course!" };
+    redraw(RD_STMSG | SM_IMMEDIATE, &without_doubt);
+}
+
+static void doSearch() {
+    srand(time(NULL));
+    if (rand() % 2) {
+        kanbujianwo();
+    }
 }
 
 /* goto offset */
@@ -1441,7 +1468,7 @@ void printCurPos() {
 
 /* search */
 void whereIs() {
-    redraw(RD_STMSG | SM_IMMEDIATE, &unimplemented);
+    doSearch();
 }
 
 /* help file */
@@ -1673,9 +1700,9 @@ void control() {
                 case 'C': /* Print Cur Pos */
                     printCurPos();
                     break;
-                //case 'S': /* Search */
-                //    whereIs();
-                //    break;
+                case 'S': /* Search */
+                    whereIs();
+                    break;
                 case 'G': /* Get help */
                     getHelp();
                     break;

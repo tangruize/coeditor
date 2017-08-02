@@ -1,0 +1,12 @@
+VER_1 {
+    global:
+        frontEnd;
+        printFrontEndBanner;
+        front_end_version;
+        front_end_author;
+        buf_changed;
+    local:
+        *;    # Hide all other symbols
+};
+
+VER_2 {} VER_1;

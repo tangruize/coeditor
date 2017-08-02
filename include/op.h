@@ -33,4 +33,14 @@ enum {
     CH_DELETE = 'D', CH_INSERT = 'I'
 };
 
+struct state_t {
+    int client;
+    int server;
+};
+
+struct trans_t {
+    op_t op;
+    state_t state;
+};
+
 #endif
