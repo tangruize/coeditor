@@ -903,8 +903,9 @@ int writeAndShowMsg(const string &s, const string &write_mode,
     int break_line = editing_file->locateLine(
                      editing_file->getTotalLines())->line.size();
     break_line = (break_line == 0) ? 1 : 0;
-    string suc = write_mode + s + " " + to_string(editing_file->
-                 getTotalLines() - break_line) + " lines";
+    int line_count = editing_file->getTotalLines() - break_line;
+    string suc = write_mode + "'"+ s + "' " + to_string(line_count)
+                 + string(" line") + (line_count == 1 ? "" : "s");
     status_t tmp = {suc.c_str()};
     redraw(RD_STMSG | SM_IMMEDIATE, &tmp);
     return 0;
@@ -1349,8 +1350,10 @@ void gotoLine(pos_t *p = NULL) {
 static void kanbujianwo() {
     status_t bixutongyi {
         "Tell me, who is the finest girl in the world ?", "Sunny",
-        "RX", "^R Ruize Tang", "   Cancel",
-        "^X Xudong Sun"
+        "WHRX", "^W Wei Nanshen", "   Cancel",
+        "^H Huang Zhujiao", "",
+        "^R Ruize Tang", "",
+        "^X Xudong Sun", ""
     };
     if (drawStatusMsgString(bixutongyi) != "Sunny\n") {
         drawStatusMsgImm("You've got a wrong answer to a SONGMINGTI");
@@ -1473,30 +1476,37 @@ void whereIs() {
 
 /* help file */
 void getHelp() {
-    textOp help;
-    char path_buf[PATH_MAX] = {0};
-    ssize_t r = readlink("/proc/self/exe", path_buf, PATH_MAX - 1);
-    status_t not_found = { "Help file not found" };
-    if (r == -1) {
-        redraw(RD_STMSG | SM_IMMEDIATE, &not_found);
-        PROMPT_ERROR_EN("readlink: get exe path");
-        return;
-    }
-    string helpfilename = dirname(path_buf);
-    helpfilename += "/doc/help.coeditor";
-    if (help.loadFile(helpfilename) != NOERR) {
-        redraw(RD_STMSG | SM_IMMEDIATE, &not_found);
-        return;
+    static textOp *help_file = NULL;
+    if (help_file == NULL) {
+        help_file = new textOp;
+        char path_buf[PATH_MAX] = {0};
+        ssize_t r = readlink("/proc/self/exe", path_buf, PATH_MAX - 1);
+        status_t not_found = { "Help file not found" };
+        if (r == -1) {
+            redraw(RD_STMSG | SM_IMMEDIATE, &not_found);
+            PROMPT_ERROR_EN("readlink: get exe path");
+            delete help_file;
+            help_file = NULL;
+            return;
+        }
+        string helpfilename = dirname(path_buf);
+        helpfilename += "/doc/help.coeditor";
+        if (help_file->loadFile(helpfilename) != NOERR) {
+            redraw(RD_STMSG | SM_IMMEDIATE, &not_found);
+            delete help_file;
+            help_file = NULL;
+            return;
+        }
     }
     textOp *saved_edit_file = editing_file;
     pos_t saved_pos = cur_pos;
     int saved_start_line = screen_start_line;
     int cursor_vis = curs_set(0);
-    editing_file = &help;
+    editing_file = help_file;
     cur_pos.lineno = 1;
     cur_pos.offset = 1;
     screen_start_line = 1;
-    help.setFilename("HELP");
+    help_file->setFilename("HELP");
     redraw(RD_ALL, &help_msgs);
     drawStatusMsgImm(NULL);
     while (true) {
@@ -1577,15 +1587,23 @@ void control() {
     /* print read information */
     if (editing_file->getFilename() != "") {
         string read_lines = "Read ";
-        read_lines += to_string(editing_file->getTotalLines()
-                      - (editing_file->hasBreakLine() ? 0 : 1))
-                      + " lines";
         if (editing_file->getTotalLines() == 1
             && access(editing_file->getFilename().c_str(), F_OK) == -1 
             && errno == ENOENT)
         {
             read_lines = "New File";
             new_file_flag = true;
+        }
+        if (!new_file_flag) {
+            if (editing_file->getTotalChars()) {
+                int line_count = editing_file->getTotalLines() 
+                            - (editing_file->hasBreakLine() ? 0 : 1);
+                read_lines += to_string(line_count) + string(" line")
+                              + ((line_count == 1) ? "" : "s");
+            }
+            else {
+                read_lines += "0 lines";
+            }
         }
         status_t rl_msg = {read_lines.c_str()};
         redraw(RD_STMSG | SM_IMMEDIATE, &rl_msg);

@@ -83,7 +83,13 @@ int saveDirFds() {
         char path_buf[PATH_MAX] = {0};
         strncpy(path_buf, edit_file->getFilename().c_str(),
                 PATH_MAX - 1);
-        edit_dir_fd = open(dirname(path_buf), O_DIRECTORY | O_RDONLY);
+        char *edit_dir_name = dirname(path_buf);
+        if (strcmp(edit_dir_name, ".") == 0) {
+            edit_dir_fd = old_cwd_fd;
+        }
+        else {
+            edit_dir_fd = open(dirname(path_buf), O_DIRECTORY | O_RDONLY);
+        }
     }
     if (old_cwd_fd == -1 || edit_dir_fd == -1) {
         PROMPT_ERROR_EN("open: save dir fds: "
@@ -177,9 +183,17 @@ int openFifos(string &name, int &readfd, int &writefd) {
 
 }
 
+int cli_read_fd = -1, cli_write_fd = -1;
 int creatCliInputFifo() {
     cli_input_fifo_name = out_file_prefix + CLI_INPUT_SUFFIX;
-    return makeFifo(cli_input_fifo_name);
+    if (makeFifo(cli_input_fifo_name) != 0
+        || openFifos(cli_input_fifo_name, cli_read_fd, cli_write_fd) != 0)
+    {
+        cerr << "CLI not started" << endl;
+        return -1;
+    }
+    close(cli_read_fd);
+    return 0;
 }
 
 int op_read_fd = -1, op_write_fd = -1;
@@ -433,6 +447,10 @@ void *write_server_thread(void *args) {
 }
 
 int checkFileLock() {
+    if (edit_file->getFilename() == "") {
+        /* new file */
+        return 0;
+    }
     lock_file = out_file_prefix_no_pid + LOCK_FILE_SUFFIX;
     int lock_file_fd = openat(edit_dir_fd, lock_file.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_file_fd == -1) {
@@ -459,13 +477,40 @@ int checkFileLock() {
     return 0;
 }
 
+void tryOpen() {
+    if (edit_file->getFilename() == "") {
+        return;
+    }
+    int tmpfd = open(edit_file->getFilename().c_str(), O_RDONLY);
+    if (tmpfd == -1) {
+        if (errno != ENOENT) {
+            PROMPT_ERROR_EN("Error opening " + edit_file->getFilename());
+            exit(EXIT_FAILURE);
+        }
+    }
+    struct stat sb;
+    if (fstat(tmpfd, &sb) == -1) {
+        PROMPT_ERROR_EN("Error stating " + edit_file->getFilename());
+        exit(EXIT_FAILURE);
+    }
+    if (!S_ISREG(sb.st_mode)) {
+        cerr << "Error: not a regular file: " + edit_file->getFilename() << endl;
+        exit(EXIT_FAILURE);
+    }
+    close(tmpfd);
+}
+
 void init() {
+    tryOpen();
     saveDirFds();
     setOutFilenames();
-    checkFileLock();
     if (atexit(removeOutFileAtExit) != 0) {
         cerr << "Cannot set exit function\n";
     }
+    checkFileLock();
+    edit_file->loadFile(edit_file->getFilename());
+    //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
+    //PROMPT_ERROR(msg);
     creatOpOutputFifo();
     if (creatOpInputFifo() == 0) {
         pthread_t read_op_id;

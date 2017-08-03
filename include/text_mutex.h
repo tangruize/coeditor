@@ -14,6 +14,8 @@
 class textOpMutex: public textOp
 {
 public:
+    virtual ~textOpMutex() {}
+
     /* delete a character, if offset is 0, will join a line */
     virtual prompt_t deleteChar(pos_t pos, char *c = NULL);
 

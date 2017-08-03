@@ -1,1 +1,113 @@
-This is the help file :-)
+Coeditor help text
+
+ The Coeditor is designed to generate edit operation sequences automatically
+ and apply operations from OT functions.  There are four main sections of the
+ editor.  The top line shows the program version, the current filename being
+ edited, and whether or not the file has been modified.  Next is the main
+ editor window showing the file being edited.  The status line is the third
+ line from the bottom and shows important messages.  The bottom two lines
+ show the most commonly used shortcuts in the editor.
+ 
+ The notation for shortcuts is as follows: Control-key sequences are notated
+ with a caret (^) symbol and can be entered either by using the Control (Ctrl)
+ key.
+
+^G            Display this help text
+^X            Close the current file buffer / Exit from Coeditor
+^W            Write the current file to disk
+^C            Display the position of the cursor
+
+^T            Go to line and column number
+^O            Go to file offset
+^Y            Go to previous screen
+^V            Go to next screen
+
+^P            Go to previous line
+^N            Go to next line
+^A            Go to beginning of current line
+^E            Go to end of current line
+
+
+Coeditor command line arguments
+
+ Invoke Coeditor without any arguments will create a new buf, and you can save
+ you modifications later.  If you provide a file name, Coeditor will check file
+ existence, permissions and whether it was opened by another Coeditor or not.
+ If file does not exist, Coeditor will create it while saving. 
+
+ Coeditor support 3 options up to now:
+
+-c server-address        Establish a connection with Jupiter server
+-w                       CLI command also write OP ouput pipe (default not)
+-p                       OP ouput using (row, col) instead of file offset
+
+
+Coeditor opened files description
+
+ Coeditor creates sevaral files.  They are named with ".coeditor.[FILENAME]." 
+ prefix.  If the editing file exists, a file with suffix "lock" will be
+ created.  LOCK file records Coeditor PID and prevents another Coeditor edits
+ the file.  Other opened files add Coeditor PID as prefix.
+
+ SUFFIX explanation: 
+ [PW] for pipe write end, [PR] for pipe read end, [F] for regular file
+ You should open PW in write-only mode and PR vice versa.
+
+[SUFFIX]                 [TYPE]  [DESCRIPTION]
+cli                      PW      Command del, ins, save and print interface.
+debug                    F       Standard error output.
+local.op.input           PW      Like cli, but accepts raw input data.
+local.op.input.feedback  PR      Indicate whether local.op.input applied.
+local.op.output          PR      Local operation sequences.
+server.input             PW      Write raw input data to server.
+server.input.feedback    PR      Indicate whether server.input sent to server.
+server.output            PR      Server output
+
+
+CLI command format
+
+ Generally, UPPERCASE uses offset while lowercase uses (row, col) to address.
+
+D offset                 Delete character at offset
+I offset char            Insert character at offset
+
+d row col                Delete charater at (row, col)
+i row col char           Insert charater at (row, col)
+
+p [lineno, [n]]          Print n lines from lineno
+s [filename]             Save to filename
+
+
+Row local input format
+
+ An input is 16 bytes in total.  For details, please see 'include/op.h' file.
+ The feedback end will return the same data if it is successfully applied,
+ otherwise, the operation field is minus.
+
+
+Server I/O format
+
+ A server I/O is 24 byte in total.  For details, please see 'include/op.h'
+ file.  If data writing to server.input is less than 24 bytes, zeros padded.
+
+
+Text format
+
+ A text file looks like this:
+
+    0  1  2  3  4  5  6  7  8
+ 1     a  b  c  d  e
+ 2  \n f  g  h  i  j
+ 3  \n k  l  m  n  o  p  q
+ 4  \n
+
+ For (row, col) format, addressing range for a line is [0, linesize] except
+ line 1, which is [1, linesize]. Note that newline character ('\n') is the
+ beginning of the line. So you cannot delete at linesize of that line, but you
+ can insert at that position.
+
+ The last line is called break line if it hasn't newline charater.  (No line 4)
+
+
+ For offset format, addressing range is [0, filesize]. You can insert but
+ cannot delete at filesize.

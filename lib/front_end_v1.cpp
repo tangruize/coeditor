@@ -24,6 +24,7 @@ extern "C" {
 static const char interp[] __attribute__((section(".interp"))) = INTERP;
 volatile int buf_changed = 0;
 int write_op = 1;
+int write_op_pos = 0;
 
 const char *front_end_version = "CLI 0.1";
 const char *front_end_author = "Ruize Tang";

@@ -178,7 +178,7 @@ uint64_t textOp::translatePos(const pos_t pos) {
         assert(cerr << "failed\n\n");
         return (uint64_t)-1;
     }
-    assert(cerr << "result: " << cur_char + pos.offset - 1 << "\n\n");
+    assert(cerr << "result: " << (int64_t)(cur_char + pos.offset - 1) << "\n\n");
     return cur_char + pos.offset - 1;
 }
 
@@ -304,7 +304,7 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
             edit_file.insert(it, pre_blank_line);
             ++cur_char;
         }
-        else if (pos.offset == it->line.size()) {
+        else if (pos.offset == it->line.size() + 1) {
             linestruct next_blank_line;
             cur_char += it->line.size() + 1;
             edit_file.insert(++it, next_blank_line);

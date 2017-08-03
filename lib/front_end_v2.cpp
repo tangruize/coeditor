@@ -13,7 +13,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
-#include "text.h"
+#include "text_mutex.h"
 #include "init.h"
 
 using namespace std;
@@ -99,7 +99,6 @@ static void *fifoInputCli_thread(void *arg) {
     ifstream in(getCliInputFifoName().c_str());
     restoreOldCwd();
     if (!in.is_open()) {
-        cerr << "CLI not started" << endl;
         return NULL;
     }
     frontEndCli(*(textOp*)arg, in);

@@ -17,10 +17,16 @@ string server_addr;
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:")) != -1) {
+    while ((opt = getopt(argc, argv, "c:pw")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
+                break;
+            case 'p':
+                write_op_pos = 1;
+                break;
+            case 'w':
+                write_op = 1;
                 break;
             default:
                 cerr << "Invalid arguments" << endl;
@@ -30,8 +36,9 @@ int main(int argc, char *argv[]) {
     textOpMutex file;
     edit_file = &file;
     if (optind < argc) {
-        auto msg = file.loadFile(argv[optind]);
-        EXIT_ERROR(msg);
+//        auto msg = file.loadFile(argv[optind]);
+//        EXIT_ERROR(msg);
+        file.setFilename(argv[optind]);
     }
     init();
     frontEnd(file);

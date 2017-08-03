@@ -25,6 +25,12 @@ class textOp {
 public:
     textOp(const string &filename = "");
 
+    /* deleting object of polymorphic class type ‘textOp’
+     * which has non-virtual destructor might cause undefined behaviour
+     * [-Wdelete-non-virtual-dtor] */
+    /* so we define one, which does nothing */
+    virtual ~textOp() {}
+
     /* init the editing file */
     prompt_t loadFile(const string &filename);
 
@@ -48,7 +54,7 @@ public:
 
     /* save file */
     prompt_t saveFile(const string &filename = "",
-            ios_base::openmode mode = ios::out);
+                ios_base::openmode mode = ios::out | ios::trunc);
 
     /* translate (row, col) to file offset */
     uint64_t translatePos(const pos_t pos);
