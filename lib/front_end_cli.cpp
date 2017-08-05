@@ -32,6 +32,7 @@ static inline void shellPrompt() {
 void frontEndCli(textOp &file, istream &in) {
     string line, cmd, data;
     op_t op, saved_op;
+    pos_t tmp_pos;
     char delete_char;
     for (shellPrompt(); getline(in, line); shellPrompt()) {
         if (line.size() == 0) {
@@ -47,7 +48,11 @@ void frontEndCli(textOp &file, istream &in) {
             ss >> offset >> data;
         }
         else {
-            ss >> op.pos.lineno >> op.pos.offset >> data;
+            /* attribute packed cannot bind to reference type */
+            //ss >> op.pos.lineno >> op.pos.offset >> data;
+            memset(&tmp_pos, -1, sizeof(tmp_pos));
+            ss >> tmp_pos.lineno >> tmp_pos.offset >> data;
+            op.pos = tmp_pos;
         }
         if (cmd.size() != 1 || ((data.size() > 2
             || (op.pos.lineno == -1 && offset == (uint64_t)-1))

@@ -1139,20 +1139,18 @@ int exitEditor() {
 
 /* insert */
 void insertChar(int ch) {
-    uint64_t off = (uint64_t)-1;
+    op_t op;
     if (!write_op_pos) {
-       off = editing_file->translatePos(cur_pos);
+       op.char_offset = editing_file->translatePos(cur_pos);
     }
     if (editing_file->insertChar(cur_pos, ch) == NOERR) {
-        op_t op;
         if (write_op_pos) {
             op.pos = cur_pos;
             op.data = ch;
             op.operation = INSERT;
             writeOpFifo(op);
         }
-        else if (off != (uint64_t)-1) {
-            op.char_offset = off;
+        else if (op.char_offset != (uint64_t)-1) {
             op.data = ch;
             op.operation = CH_INSERT;
             writeOpFifo(op);
@@ -1176,10 +1174,9 @@ void insertChar(int ch) {
 
 /* delete predecessor */
 void keyBackspace() {
-    uint64_t off = (uint64_t)-1;
     char ch = 0;
     string del_result;
-    pos_t saved_pos = cur_pos;
+    op_t op;
     if (cur_pos.offset <= 1) {
         if (cur_pos.lineno > 1) {
             cur_pos.offset = INT_MAX;
@@ -1190,11 +1187,13 @@ void keyBackspace() {
                 --cur_pos.lineno;
                 redraw();
             }
-            --saved_pos.offset;
             if (!write_op_pos) {
-                off = editing_file->translatePos(saved_pos);
+                op.char_offset = editing_file->translatePos(cur_pos);
             }
-            del_result = editing_file->deleteChar(saved_pos, &ch);
+            else {
+                op.pos = cur_pos;
+            }
+            del_result = editing_file->deleteChar(cur_pos, &ch);
             redraw();
         }
         else {
@@ -1204,23 +1203,22 @@ void keyBackspace() {
     }
     else {
         --cur_pos.offset;
-        saved_pos = cur_pos;
         if (!write_op_pos) {
-            off = editing_file->translatePos(cur_pos);
+            op.char_offset = editing_file->translatePos(cur_pos);
+        }
+        else {
+            op.pos = cur_pos;
         }
         del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
     }
-    op_t op;
     if (del_result == NOERR) {
         if (write_op_pos) {
-            op.pos = saved_pos;
             op.data = ch;
             op.operation = DELETE;
             writeOpFifo(op);
         }
-        else if (off != (uint64_t)-1) {
-            op.char_offset = off;
+        else if (op.char_offset != (uint64_t)-1) {
             op.data = ch;
             op.operation = CH_DELETE;
             writeOpFifo(op);
@@ -1230,41 +1228,39 @@ void keyBackspace() {
 
 /* delete cur char */
 void keyDelete() {
-    uint64_t off = (uint64_t)-1;
     char ch = 0;
     string del_result;
-    pos_t saved_pos = cur_pos;
-    if (cur_pos.offset <= cur_line_size) {
+    op_t op;
+    if (cur_pos.offset <= cur_line_size + 1) {
+        if (cur_pos.offset == cur_line_size + 1
+            && cur_pos.lineno == editing_file->getTotalLines())
+        {
+            return;
+        }
         if (!write_op_pos) {
-           off = editing_file->translatePos(cur_pos);
+           op.char_offset = editing_file->translatePos(cur_pos);
+        }
+        else {
+            op.pos = cur_pos;
         }
         del_result = editing_file->deleteChar(cur_pos, &ch);
-        redrawCurLine();
-    }
-    else if (cur_pos.lineno < editing_file->getTotalLines()) {
-        pos_t del_pos = cur_pos;
-        ++del_pos.lineno;
-        del_pos.offset = 0;
-        saved_pos = del_pos;
-        if (!write_op_pos) {
-           off = editing_file->translatePos(del_pos);
+        if (cur_pos.offset == cur_line_size + 1) {
+            redraw();
         }
-        del_result = editing_file->deleteChar(del_pos, &ch);
-        redraw();
+        else {
+            redrawCurLine();
+        }
     }
     else {
         return;
     }
-    op_t op;
     if (del_result == NOERR) {
         if (write_op_pos) {
-            op.pos = saved_pos;
             op.data = ch;
             op.operation = DELETE;
             writeOpFifo(op);
         }
-        else if (off != (uint64_t)-1) {
-            op.char_offset = off;
+        else if (op.char_offset != (uint64_t)-1) {
             op.data = ch;
             op.operation = CH_DELETE;
             writeOpFifo(op);

@@ -47,10 +47,12 @@ public:
     virtual prompt_t insertChar(pos_t pos, char c);
 
     /* delete a character at given file offset */
-    virtual prompt_t deleteCharAt(uint64_t off, char *c = NULL);
+    virtual prompt_t deleteCharAt(uint64_t off, char *c = NULL,
+                                  pos_t *p = NULL);
 
     /* insert a character at given file offset */
-    virtual prompt_t insertCharAt(uint64_t off, char c);
+    virtual prompt_t insertCharAt(uint64_t off, char c,
+                                  pos_t *p = NULL);
 
     /* save file */
     prompt_t saveFile(const string &filename = "",

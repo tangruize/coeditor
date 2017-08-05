@@ -225,9 +225,10 @@ prompt_t textOp::deleteChar(pos_t pos, char *c) {
                 << pos.offset << ")\n");
     assert(cerr << "---Locating line " << pos.lineno << '\n');
     file_t::iterator it = locateLine(pos.lineno);
-    if (it == edit_file.end() || it->line.size() < pos.offset
-        || pos.offset < 0 
-        || (pos.offset == 0 && it == edit_file.begin()))
+    if (it == edit_file.end() || it->line.size() + 1 < pos.offset
+        || pos.offset < 1
+        || (pos.lineno == edit_file.size()
+        && it->line.size() + 1 == pos.offset))
     {
         return "deleteChar: position out of range (" 
                + to_string(pos.lineno) + ", " 
@@ -236,15 +237,12 @@ prompt_t textOp::deleteChar(pos_t pos, char *c) {
     char delete_char;
     --total_chars;
     assert(cerr << "---delete char: '");
-    if (pos.offset == 0) {
+    if (pos.offset == it->line.size() + 1) {
         delete_char = '\n';
         assert(cerr << "\\n'\n" << "---before del: "
                << it->line << endl);
         file_t::iterator to_join = it;
-        --it;
-        cur_char -= it->line.size() + 1;
-        cur_line_it = it;
-        --cur_line_no;
+        ++to_join;
         it->line += to_join->line;
         edit_file.erase(to_join);
     }
@@ -335,19 +333,25 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
 }
 
 /* delete a character at given file offset */
-prompt_t textOp::deleteCharAt(uint64_t off, char *c) {
+prompt_t textOp::deleteCharAt(uint64_t off, char *c, pos_t *p) {
     pos_t pos = translateOffset(off);
     if (pos.lineno < 1) {
         return "deleteCharAt: offset out of range: " + to_string(off);
+    }
+    if (p) {
+        *p = pos;
     }
     return deleteChar(pos, c);
 }
 
 /* insert a character at given file offset */
-prompt_t textOp::insertCharAt(uint64_t off, char c) {
+prompt_t textOp::insertCharAt(uint64_t off, char c, pos_t *p) {
     pos_t pos = translateOffset(off);
     if (pos.lineno < 1) {
         return "insertCharAt: offset out of range: " + to_string(off);
+    }
+    if (p) {
+        *p = pos;
     }
     return insertChar(pos, c);
 }

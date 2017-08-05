@@ -20,10 +20,10 @@
 #include <libgen.h>
 #include <limits.h>
 #include <ctype.h>
-#include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <pthread.h>
 
 string out_file_prefix_no_pid = OUT_FILE_PREFIX;
 string out_file_prefix;
@@ -52,6 +52,8 @@ string lock_file;
 string getCliInputFifoName() {
     return cli_input_fifo_name;
 }
+
+short program_id;
 
 /* set out files name */
 void setOutFilenames() {
@@ -294,23 +296,22 @@ void reportWriteOpError(const op_t &op, int en) {
         cerr << "---pos: (" << op.pos.lineno << ", "
              << op.pos.offset << ")\n";
     }
-    if (op.operation == 'i' || op.operation == 'I') {
-        cerr << "---data: '";
-        if (isprint(op.data)) {
-            cerr << op.data << "'\n";
-        }
-        else {
-            cerr << "0x" << hex << uppercase << (unsigned)op.data
-                 << "'\n";
-            cerr.unsetf(ios_base::hex);
-        }
+    cerr << "---data: '";
+    if (isprint(op.data)) {
+        cerr << op.data << "'\n";
+    }
+    else {
+        cerr << "0x" << hex << uppercase << (unsigned)op.data
+             << "'\n";
+        cerr.unsetf(ios_base::hex);
     }
 }
 
-void writeOpFifo(const op_t &op) {
+void writeOpFifo(op_t &op) {
     if (op_write_fd == -1 || op_read_fd == -1) {
         return;
     }
+    op.id = program_id;
     static char pipe_buf[PIPE_BUF];
     int try_times = 3;
     while (try_times--
@@ -374,7 +375,7 @@ void *readOp_Thread(void *args) {
                 op.operation = -op.operation;
             }
             else if (op.operation == 0) {
-                op.operation = INT_MIN;
+                op.operation = CHAR_MIN;
             }
         }
         else {
@@ -431,7 +432,7 @@ void *write_server_thread(void *args) {
                 t.op.operation = -t.op.operation;
             }
             else {
-                t.op.operation = INT_MIN;
+                t.op.operation = CHAR_MIN;
             }
         }
         int try_times = 3;
@@ -508,6 +509,7 @@ void init() {
         cerr << "Cannot set exit function\n";
     }
     checkFileLock();
+    program_id = (short)getpid();
     edit_file->loadFile(edit_file->getFilename());
     //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
     //PROMPT_ERROR(msg);

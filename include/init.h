@@ -44,7 +44,7 @@ int gotoEditFileDir();
 int restoreOldCwd();
 void redirectStderr();
 int creatCliInputFifo();
-void writeOpFifo(const op_t &op);
+void writeOpFifo(op_t &op);
 void init();
 string getCliInputFifoName();
 

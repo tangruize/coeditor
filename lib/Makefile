@@ -23,7 +23,7 @@ CXXFLAGS += -fPIC
 
 all : ${LIBS}
 
-static : ${LIBS}
+#static : ${LIBS}
 
 cli : ${FRONT_END_CLI_LIB}
 	@ libname=`readlink libfrontend.so.1`; \

@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
                 data.op.operation = -data.op.operation;
             }
             else if (data.op.operation == 0) {
-                data.op.operation = INT_MIN;
+                data.op.operation = CHAR_MIN;
             }
         }
         if (write(STDOUT_FILENO, &data, sizeof(trans_t)) != sizeof(trans_t)) {

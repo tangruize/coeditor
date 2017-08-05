@@ -49,7 +49,7 @@ rm -f ${PREFIX}*.debug ${PREFIX}*.cli ${PREFIX}*.local.op* ${PREFIX}*.server* ${
 gnome-terminal --title='coeditor' -e "$EXE $*"
 
 # wait for creating debug file
-sleep 1
+sleep 3
 clear
 
 # Set file names
@@ -77,9 +77,9 @@ else
 fi
 
 if [ -p "$SERVER_OP_IN" ]; then
-    LO_REDIRECT="tee $SERVER_OP_IN | xxd"
+    LO_REDIRECT="tee $SERVER_OP_IN | xxd -c 12"
 else
-    LO_REDIRECT="xxd"
+    LO_REDIRECT="xxd -c 12"
 fi
 
 if [ -p "$LOCAL_OP" ]; then
@@ -94,7 +94,7 @@ fi
 
 if [ -p "$SERVER_OP" ]; then
     gnome-terminal --title='from server' \
-        -e "bash -c \"cat $SERVER_OP | tee $EXE_DIR/server_ops | xxd -c 24\""
+        -e "bash -c \"cat $SERVER_OP | tee $EXE_DIR/server_ops | xxd -c 20\""
 fi
 
 if [ -p "$CLI_FILE" ]; then

@@ -40,11 +40,11 @@ clear
 # Set file names
 LOCAL_OP_IN=$(ls ${PREFIX}*.local.op.input)
 
-for i in $(seq 0 $(($(stat -c %s ${EXE_DIR}/local_ops) / 16 - 1))); do
+for i in $(seq 0 $(($(stat -c %s ${EXE_DIR}/local_ops) / 12 - 1))); do
     if [ ! -p $LOCAL_OP_IN ]; then
         exit
     fi
-    dd if=${EXE_DIR}/local_ops of=${LOCAL_OP_IN} count=16 \
-        skip=$((i * 16)) iflag=count_bytes,skip_bytes 2> /dev/null
+    dd if=${EXE_DIR}/local_ops of=${LOCAL_OP_IN} count=12 \
+        skip=$((i * 12)) iflag=count_bytes,skip_bytes 2> /dev/null
     sleep 0.15
 done

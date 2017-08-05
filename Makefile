@@ -2,7 +2,7 @@
 # (The library directory is first so that the library gets built first)
 #
 
-DIRS = lib server src
+DIRS = lib server ot src
 
 BUILD_DIRS = ${DIRS}
 
@@ -10,9 +10,6 @@ BUILD_DIRS = ${DIRS}
 
 all:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE}) ; done
-
-static:
-	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} static) ; done
 
 clean:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} clean) ; done

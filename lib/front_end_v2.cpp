@@ -10,11 +10,11 @@
 #include <istream>
 #include <fstream>
 #include <string>
-#include <pthread.h>
 #include <unistd.h>
 #include <string.h>
 #include "text_mutex.h"
 #include "init.h"
+#include <pthread.h>
 
 using namespace std;
 

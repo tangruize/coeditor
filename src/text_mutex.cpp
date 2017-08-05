@@ -8,7 +8,6 @@
 
 #include "common.h"
 #include "text_mutex.h"
-
 #include <pthread.h>
 
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -41,19 +40,12 @@ prompt_t textOpMutex::insertChar(pos_t pos, char c) {
     return msg;
 }
 
-prompt_t textOpMutex::deleteCharAt(uint64_t off, char *c) {
+prompt_t textOpMutex::deleteCharAt(uint64_t off, char *c, pos_t *p) {
     int s = pthread_mutex_lock(&mtx);
     if (s != 0) {
         PROMPT_ERROR_EN("deleteCharAt: lock mutex");
     }
-    pos_t pos = translateOffset(off);
-    string msg;
-    if (pos.lineno < 1) {
-        msg = "deleteCharAt: offset out of range: " + to_string(off);
-    }
-    else {
-        msg = textOp::deleteChar(pos, c);
-    }
+    prompt_t msg = textOp::deleteCharAt(off, c, p);
     s = pthread_mutex_unlock(&mtx);
     if (s != 0) {
         PROMPT_ERROR_EN("deleteCharAt: unlock mutex");
@@ -61,19 +53,12 @@ prompt_t textOpMutex::deleteCharAt(uint64_t off, char *c) {
     return msg;
 }
 
-prompt_t textOpMutex::insertCharAt(uint64_t off, char c) {
+prompt_t textOpMutex::insertCharAt(uint64_t off, char c, pos_t *p) {
     int s = pthread_mutex_lock(&mtx);
     if (s != 0) {
         PROMPT_ERROR_EN("insertCharAt: lock mutex");
     }
-    pos_t pos = translateOffset(off);
-    string msg;
-    if (pos.lineno < 1) {
-        msg = "insertCharAt: offset out of range: " + to_string(off);
-    }
-    else {
-        msg = textOp::insertChar(pos, c);
-    }
+    prompt_t msg = textOp::insertCharAt(off, c, p);
     s = pthread_mutex_unlock(&mtx);
     if (s != 0) {
         PROMPT_ERROR_EN("insertCharAt: unlock mutex");

@@ -9,8 +9,7 @@ Coeditor help text
  show the most commonly used shortcuts in the editor.
  
  The notation for shortcuts is as follows: Control-key sequences are notated
- with a caret (^) symbol and can be entered either by using the Control (Ctrl)
- key.
+ with a caret (^) symbol and can be entered by using the Control (Ctrl) key.
 
 ^G            Display this help text
 ^X            Close the current file buffer / Exit from Coeditor
@@ -31,14 +30,14 @@ Coeditor help text
 Coeditor command line arguments
 
  Invoke Coeditor without any arguments will create a new buf, and you can save
- you modifications later.  If you provide a file name, Coeditor will check file
- existence, permissions and whether it was opened by another Coeditor or not.
- If file does not exist, Coeditor will create it while saving. 
+ your modifications later.  If you provide a file name, Coeditor will check
+ file existence, permissions and whether it was opened by another Coeditor or
+ not.  If file does not exist, Coeditor will create it while saving. 
 
  Coeditor support 3 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
--w                       CLI command also write OP ouput pipe (default not)
+-w                       CLI command also writes OP ouput pipe (default not)
 -p                       OP ouput using (row, col) instead of file offset
 
 
@@ -78,36 +77,35 @@ p [lineno, [n]]          Print n lines from lineno
 s [filename]             Save to filename
 
 
-Row local input format
+Local I/O format
 
- An input is 16 bytes in total.  For details, please see 'include/op.h' file.
- The feedback end will return the same data if it is successfully applied,
- otherwise, the operation field is minus.
+ A local I/O is 12 bytes in total.  For details, please see 'include/op.h'
+ file.  The feedback end will return the same data if it is successfully
+ applied, otherwise, the operation field is minus.
 
 
 Server I/O format
 
- A server I/O is 24 byte in total.  For details, please see 'include/op.h'
- file.  If data writing to server.input is less than 24 bytes, zeros padded.
-
+ A server I/O is 20 byte in total.  For details, please see 'include/op.h'
+ file.  If data writing to server.input is less than 20 bytes, zeros padded.
+ The feedback end is the same as Local I/O.
 
 Text format
 
  A text file looks like this:
 
-    0  1  2  3  4  5  6  7  8
- 1     a  b  c  d  e
- 2  \n f  g  h  i  j
- 3  \n k  l  m  n  o  p  q
- 4  \n
+    1  2  3  4  5  6  7  8      [LINESIZE]
+ 1  a  b  c  d  e  \n               5
+ 2  f  g  h  i  j  \n               5
+ 3  k  l  m  n  o  p  q  \n         7
+ 4                                  0
 
- For (row, col) format, addressing range for a line is [0, linesize] except
- line 1, which is [1, linesize]. Note that newline character ('\n') is the
- beginning of the line. So you cannot delete at linesize of that line, but you
- can insert at that position.
+ For (row, col) format, addressing range for a line is [1, linesize+1]. Note
+ that newline character ('\n') is the end of the line. So you cannot delete
+ at linesize+1 of last line (line 4), but you can insert at that position.
 
- The last line is called break line if it hasn't newline charater.  (No line 4)
+ The last line is called break line if it hasn't newline charater. (No line 4 
+ in this example).  You can edit the last newline character in Coeditor.
 
-
- For offset format, addressing range is [0, filesize]. You can insert but
+ For offset format, addressing range is [0, filesize].  You can insert but
  cannot delete at filesize.

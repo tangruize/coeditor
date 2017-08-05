@@ -19,13 +19,14 @@ struct pos_t {
 
 /* operation struct */
 struct op_t {
-    int operation;
-    int data;
+    char operation;
+    char data;
+    short id;
     union {
         pos_t pos;
         uint64_t char_offset;
     };
-};
+}__attribute__((packed));
 
 /* enum some operations */
 enum {
@@ -41,6 +42,6 @@ struct state_t {
 struct trans_t {
     op_t op;
     state_t state;
-};
+}__attribute__((packed));
 
 #endif
