@@ -15,7 +15,10 @@ extern "C" void frontEnd(textOp &file);
 extern "C" const char *front_end_version;
 extern "C" const char *front_end_author;
 extern "C" volatile int buf_changed;
+extern "C" volatile int ot_status;
 extern "C" int write_op_pos;
 extern "C" int write_op;
+extern "C" int front_end_number_version;
+extern "C" int no_cli;
 
 #endif

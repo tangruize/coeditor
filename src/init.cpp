@@ -20,40 +20,26 @@
 #include <libgen.h>
 #include <limits.h>
 #include <ctype.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/wait.h>
 #include <pthread.h>
+
+#define DISABLE_EX_LOCK
+#define TRASH_FILE "/dev/null"
 
 string out_file_prefix_no_pid = OUT_FILE_PREFIX;
 string out_file_prefix;
-
 textOp *edit_file;
-
-#define TRASH_FILE "/dev/null"
-string debug_output_file_name;
-
-string cli_input_fifo_name;
-
-string op_output_fifo_name;
-
-string op_input_fifo_name;
-
-string op_input_feedback_fifo_name;
-
-string to_server_fifo_name;
-
-string to_server_feedback_fifo_name;
-
-string from_server_fifo_name;
-
-string lock_file;
 
 string getCliInputFifoName() {
     return cli_input_fifo_name;
 }
 
-short program_id;
+user_id_t program_id;
+queue<op_t> *pos_to_transform;
 
 /* set out files name */
 void setOutFilenames() {
@@ -70,7 +56,6 @@ void setOutFilenames() {
     out_file_prefix_no_pid += filename + ".";
     out_file_prefix = out_file_prefix_no_pid
                       + to_string((long)getpid()) + string(".");
-    //debug_output_file_name = out_file_prefix_no_pid + DEBUG_FILE_SUFFIX;
 }
 
 /* save old cwd fd */
@@ -90,7 +75,7 @@ int saveDirFds() {
             edit_dir_fd = old_cwd_fd;
         }
         else {
-            edit_dir_fd = open(dirname(path_buf), O_DIRECTORY | O_RDONLY);
+            edit_dir_fd = open(edit_dir_name, O_DIRECTORY | O_RDONLY);
         }
     }
     if (old_cwd_fd == -1 || edit_dir_fd == -1) {
@@ -120,18 +105,16 @@ int restoreOldCwd() {
     return 0;
 }
 
-void deleteOutFile(const string &name, const string &ignore = "") {
+void deleteOutFile(string &name, const string &ignore = "") {
     if (name.size() && name != ignore) {
         if (unlinkat(edit_dir_fd, name.c_str(), 0) == -1) {
             PROMPT_ERROR_EN("unlink: " + name);
         }
+        name.clear();
     }
 }
 
-void removeOutFileAtExit() {
-    deleteOutFile(lock_file);
-    deleteOutFile(debug_output_file_name, TRASH_FILE);
-    deleteOutFile(cli_input_fifo_name);
+void removeFifos() {
     deleteOutFile(op_output_fifo_name);
     deleteOutFile(op_input_fifo_name);
     deleteOutFile(op_input_feedback_fifo_name);
@@ -140,22 +123,31 @@ void removeOutFileAtExit() {
     deleteOutFile(from_server_fifo_name);
 }
 
+void removeOutFileAtExit() {
+    deleteOutFile(lock_file);
+    deleteOutFile(debug_output_file_name, TRASH_FILE);
+    deleteOutFile(cli_input_fifo_name);
+    removeFifos();
+}
+
 /* we might use stderr to print some debug message */
 void redirectStderr() {
 //    gotoEditFileDir();
-    debug_output_file_name = out_file_prefix + DEBUG_FILE_SUFFIX;
+    if (no_debug) {
+        debug_output_file_name = TRASH_FILE;
+    }
+    else {
+        debug_output_file_name = out_file_prefix + DEBUG_FILE_SUFFIX;
+    }
     int fd = openat(edit_dir_fd, debug_output_file_name.c_str(),
-             O_CREAT | O_TRUNC | O_WRONLY, 0644);
+             O_CREAT | O_TRUNC | O_WRONLY | O_APPEND, 0644);
     if (fd == -1) {
         debug_output_file_name  = TRASH_FILE;
         fd = open(TRASH_FILE, O_CREAT | O_TRUNC | O_WRONLY, 0644);
     }
 //    restoreOldCwd();
-    if (debug_output_file_name == TRASH_FILE) {
-        cerr << "cannot create debug file\n";
-    }
     if (dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
-        cerr << "cannot dup stderr\n";
+        //cerr << "cannot dup stderr\n";
         close(fd);
         return;
     }
@@ -178,7 +170,6 @@ int openFifos(string &name, int &readfd, int &writefd) {
         close(writefd);
         readfd = writefd = -1;
         deleteOutFile(name);
-        name.clear();
         return -1;
     }
     return 0;
@@ -340,32 +331,36 @@ int readOpInFifo(op_t &op) {
 
 void *readOp_Thread(void *args) {
     pthread_detach(pthread_self());
-    op_t op;
+    op_t op, q_op;
     int ret;
     string op_result;
-    creatOpInputFeedbackFifo();
     while ((ret = readOpInFifo(op)) != 0) {
         if (ret == -1) {
             PROMPT_ERROR_EN("read op input fifo");
             break;
         }
         char del_ch = 0;
+        q_op = op;
         switch (op.operation) {
             case DELETE:
                 op_result = edit_file->deleteChar(op.pos, &del_ch);
                 op.data = del_ch;
+                q_op.data = del_ch;
                 break;
             case CH_DELETE:
                 op_result = edit_file->deleteCharAt(op.char_offset, 
-                                                   &del_ch);
+                                               &del_ch, &q_op.pos);
                 op.data = del_ch;
+                q_op.operation = DELETE;
+                q_op.data = del_ch;
                 break;
             case INSERT:
                 op_result = edit_file->insertChar(op.pos, op.data);
                 break;
             case CH_INSERT:
                 op_result = edit_file->insertCharAt(op.char_offset,
-                                                   op.data);
+                                               op.data, &q_op.pos);
+                q_op.operation = INSERT;
                 break;
             default:
                 op_result = "FAILED";
@@ -377,8 +372,10 @@ void *readOp_Thread(void *args) {
             else if (op.operation == 0) {
                 op.operation = CHAR_MIN;
             }
+            PROMPT_ERROR(op_result);
         }
-        else {
+        else if (front_end_number_version > 1) {
+            pos_to_transform->push(q_op);
             buf_changed = 1;
         }
         if (op_in_feedback_write_fd != -1) {
@@ -448,6 +445,9 @@ void *write_server_thread(void *args) {
 }
 
 int checkFileLock() {
+    #ifdef DISABLE_EX_LOCK
+    return 0;
+    #endif
     if (edit_file->getFilename() == "") {
         /* new file */
         return 0;
@@ -495,13 +495,141 @@ void tryOpen() {
         exit(EXIT_FAILURE);
     }
     if (!S_ISREG(sb.st_mode)) {
-        cerr << "Error: not a regular file: " + edit_file->getFilename() << endl;
+        cerr << "Error: not a regular file: " 
+             << edit_file->getFilename() << endl;
         exit(EXIT_FAILURE);
     }
     close(tmpfd);
 }
 
+const op_t* queuedOp(int enqueue, op_t *op) {
+    if (pos_to_transform == NULL) {
+        return NULL;
+    }
+    if (enqueue) {
+        pos_to_transform->push(*op);
+    }
+    else {
+        if (pos_to_transform->empty()) {
+            return NULL;
+        }
+        static op_t tmp;
+        tmp = pos_to_transform->front();
+        pos_to_transform->pop();
+        if (op) {
+            *op = tmp;
+        }
+        return &tmp;
+    }
+    return NULL;
+}
+
+void sigHandler(int sig) {
+    exit(EXIT_SUCCESS);
+}
+
+void sigchldHandler(int sig) {
+    int status;
+    int pid = waitpid(-1, &status, WNOHANG);
+    if (pid <= 0) {
+        return;
+    }
+    if (WIFEXITED(status)) {
+        cerr << "OT (PID " << pid << ") exited, status="
+             << WEXITSTATUS(status) << endl;
+        ot_status = status;
+    }
+    else if (WIFSIGNALED(status)) {
+        cerr << "OT (PID " << pid << ") killed by signal "
+             << WTERMSIG(status) << " ("
+             << strsignal(WTERMSIG(status)) << endl;
+        ot_status = status;
+    }
+}
+
+void initSignal() {
+    struct sigaction sa;
+    sa.sa_flags = SA_RESTART;
+    sa.sa_handler = sigHandler;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGINT, &sa, NULL) == -1
+        || sigaction(SIGTERM, &sa, NULL) == -1)
+    {
+        PROMPT_ERROR_EN("Error establishing signal handlers");
+        exit(EXIT_FAILURE);
+    }
+    sa.sa_handler = sigchldHandler;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        PROMPT_ERROR_EN("Error establishing sigchld handler");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void initOt() {
+    int fds[7] = {op_read_fd, op_in_write_fd, 2, server_out_read_fd, 
+                  server_in_write_fd, op_in_feedback_write_fd,
+                  server_in_feedback_write_fd};
+    int max = 2;
+    for (int i = 0; i < 7; ++i) {
+        if (fds[i] < 0) {
+            cerr << "OT not started" << endl;
+            return;
+        }
+        else if (fds[i] > max) {
+            max = fds[i];
+        }
+    }
+    if (fork() != 0) {
+        return;
+    }
+    ++max;
+    /* new process */
+    if (front_end_number_version > 1) {
+        redirectStderr();
+    }
+    for (int i = 0; i < 7; ++i) {
+        if (dup2(fds[i], max + i) != max + i) {
+            PROMPT_ERROR_EN("dup2");
+            _exit(EXIT_FAILURE);
+        }
+    }
+    for (int i = 0; i < 7; ++i) {
+        if (dup2(max + i, i) != i) {
+            PROMPT_ERROR("dup2(2)");
+            _exit(EXIT_FAILURE);
+        }
+        int flags = fcntl(i, F_GETFL);
+        if (flags == -1) {
+            PROMPT_ERROR_EN("fcntl");
+            _exit(EXIT_FAILURE);
+        }
+        flags &= ~O_NONBLOCK;
+        fcntl(i, F_SETFL);
+    }
+    for (int i = 7; i < 50; ++i) {
+        close(i);
+    }
+    extern char *program_invocation_name;
+    chdir(dirname(program_invocation_name));
+    if (ot_time_arg.size()) {
+        if (execl("./jupiter-ot", "jupiter-ot", "-t", 
+                  ot_time_arg.c_str(), NULL) == -1)
+        {
+            PROMPT_ERROR_EN("execl");
+            _exit(EXIT_FAILURE);
+        }
+    }
+    else {
+        if (execl("./jupiter-ot", "jupiter-ot", NULL) == -1)
+        {
+            PROMPT_ERROR_EN("execl");
+            _exit(EXIT_FAILURE);
+        }
+    }
+}
+
 void init() {
+    initSignal();
     tryOpen();
     saveDirFds();
     setOutFilenames();
@@ -509,29 +637,62 @@ void init() {
         cerr << "Cannot set exit function\n";
     }
     checkFileLock();
-    program_id = (short)getpid();
-    edit_file->loadFile(edit_file->getFilename());
-    //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
-    //PROMPT_ERROR(msg);
+    program_id = (user_id_t)getpid();
+    if (front_end_number_version > 1) {
+        pos_to_transform = new queue<op_t>;
+    }
     creatOpOutputFifo();
     if (creatOpInputFifo() == 0) {
+        creatOpInputFeedbackFifo();
         pthread_t read_op_id;
         int s = pthread_create(&read_op_id, NULL, readOp_Thread, NULL);
         if (s != 0) {
             close(op_in_read_fd);
             close(op_in_write_fd);
             deleteOutFile(op_input_fifo_name);
-            op_input_fifo_name.clear();
             cerr << "OP input not started" << endl;
         }
     }
     if (server_addr.size()) {
-        socket_fd = inetConnect(server_addr.c_str(), "jupiter", SOCK_STREAM);
+        socket_fd = inetConnect(server_addr.c_str(),
+                                "jupiter", SOCK_STREAM);
         if (socket_fd == -1) {
             PROMPT_ERROR_EN("Error connecting " + server_addr);
-            sleep(2);
+            exit(EXIT_FAILURE);
         }
-        else if (creatServerOuputFifo() == -1
+        auth_t auth = {
+            program_id, 
+            "d41d8cd98f00b204e9800998ecf8427e"
+        };
+        if (edit_file->getFilename().size()) {
+            cerr << "Calculating '" << edit_file->getFilename()
+                 << "' md5sum..." << endl;
+            string md5sum_file = "/tmp/" + out_file_prefix + "md5sum";
+            string cmd = "md5sum " + edit_file->getFilename() + " >"
+                         + md5sum_file;
+            int sys_ret = system(cmd.c_str());
+            if (sys_ret != 0) {
+                EXIT_ERROR("Error calculating md5sum");
+            }
+            int md5_fd = open(md5sum_file.c_str(), O_RDONLY);
+            unlink(md5sum_file.c_str());
+            if (md5_fd == -1) {
+                PROMPT_ERROR_EN("Error reading md5sum");
+                exit(EXIT_FAILURE);
+            }
+            if (read(md5_fd, auth.md5sum, MD5SUM_SIZE) != MD5SUM_SIZE)
+            {
+                EXIT_ERROR("Error reading md5sum");
+            }
+            close(md5_fd);
+        }
+        cerr << "Connecting " << server_addr << "..." << endl;
+        if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
+            || read(socket_fd, &auth, sizeof(auth)) <=0)
+        {
+            EXIT_ERROR("Error authenticating");
+        }
+        if (creatServerOuputFifo() == -1
                  || creatServerInputFifo() == -1
                  || creatServerInputFeedbackFifo() == -1)
         {
@@ -545,8 +706,8 @@ void init() {
             if (s != 0) {
                 close(server_out_read_fd);
                 close(server_out_write_fd);
+                server_out_read_fd = server_out_write_fd = -1;
                 deleteOutFile(from_server_fifo_name);
-                from_server_fifo_name.clear();
                 cerr << "Server output not started" << endl;
             }
             s = pthread_create(&write_server_id, NULL, write_server_thread,
@@ -554,14 +715,24 @@ void init() {
             if (s != 0) {
                 close(server_in_read_fd);
                 close(server_in_write_fd);
+                server_in_read_fd = server_in_write_fd = -1;
                 close(server_in_feedback_read_fd);
                 close(server_in_feedback_write_fd);
+                server_in_feedback_read_fd = -1;
+                server_in_feedback_write_fd = -1;
                 deleteOutFile(to_server_fifo_name);
                 deleteOutFile(to_server_feedback_fifo_name);
-                to_server_fifo_name.clear();
-                to_server_feedback_fifo_name.clear();
                 cerr << "Server input not started" << endl;
             }
         }
+        if (remove_fifo_ot) {
+            initOt();
+        }
     }
+    if (remove_fifo_ot) {
+        removeFifos();
+    }
+    edit_file->loadFile(edit_file->getFilename());
+    //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
+    //PROMPT_ERROR(msg);
 }

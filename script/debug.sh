@@ -46,10 +46,10 @@ echo "  p [line [count]]"
 rm -f ${PREFIX}*.debug ${PREFIX}*.cli ${PREFIX}*.local.op* ${PREFIX}*.server* ${EXE_DIR}/local_ops ${EXE_DIR}/server_ops
 
 # new terminal to run the instance
-gnome-terminal --title='coeditor' -e "$EXE $*"
+gnome-terminal --title='coeditor' -e "$EXE $* -old"
 
 # wait for creating debug file
-sleep 3
+sleep 1
 clear
 
 # Set file names

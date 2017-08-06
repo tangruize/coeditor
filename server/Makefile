@@ -4,10 +4,14 @@ SRC = $(wildcard *.cpp)
 
 EXE = ../jupiter-server
 
+LIB_DIR = ../lib
+
+LIBS = ${LIB_DIR}/libinetsockets.a
+
 all : ${EXE}
 
 ${EXE} : $(SRC:.cpp=.o)
-	${CXX} ${CXXFLAGS} -o $@ $^
+	${CXX} ${CXXFLAGS} -o $@ $^ ${LIBS}
 
 %.d: %.cpp
 	@set -e; rm -f $@; \

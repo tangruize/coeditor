@@ -341,7 +341,7 @@ prompt_t textOp::deleteCharAt(uint64_t off, char *c, pos_t *p) {
     if (p) {
         *p = pos;
     }
-    return deleteChar(pos, c);
+    return textOp::deleteChar(pos, c);
 }
 
 /* insert a character at given file offset */
@@ -353,7 +353,7 @@ prompt_t textOp::insertCharAt(uint64_t off, char c, pos_t *p) {
     if (p) {
         *p = pos;
     }
-    return insertChar(pos, c);
+    return textOp::insertChar(pos, c);
 }
 
 /* save file */

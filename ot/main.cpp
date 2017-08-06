@@ -6,14 +6,16 @@
 	> Description: 
  ************************************************************************/
 
-#include "common.h"
-#include "op.h"
 #include <poll.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
 #include <signal.h>
+#include <queue>
+
+#include "common.h"
+#include "op.h"
 
 #define FROM_LOCAL_FILENO      0
 #define TO_LOCAL_FILENO        1
@@ -32,9 +34,13 @@ struct pollfd fds[] = {
 
 state_t state;
 list<trans_t> outgoing;
-unsigned sleep_before_send = 0;
+queue<trans_t> to_send;
+int sleep_before_send = 0;
 
-void xform(op_t &op, op_t &outop) {
+int xform(op_t &op, op_t &outop) {
+    if (op.operation == 0) {
+        return 1;
+    }
     if (op.operation == CH_DELETE && outop.operation == CH_DELETE) {
         if (op.char_offset > outop.char_offset) {
             --op.char_offset;
@@ -44,6 +50,8 @@ void xform(op_t &op, op_t &outop) {
         }
         else /* if (op.char_offset == outop.char_offset) */ {
             /* delete same char, do nothing */
+            op.operation = NOOP;
+            return 1;
         }
     }
     else if (op.operation == CH_DELETE && outop.operation == CH_INSERT)
@@ -57,11 +65,11 @@ void xform(op_t &op, op_t &outop) {
     }
     else if (op.operation == CH_INSERT && outop.operation == CH_DELETE)
     {
-        if (op.char_offset >= outop.char_offset) {
+        if (op.char_offset > outop.char_offset) {
             --op.char_offset;
         }
-        else /* if (op.char_offset < outop.char_offset) */ {
-            --outop.char_offset;
+        else /* if (op.char_offset <= outop.char_offset) */ {
+            ++outop.char_offset;
         }
         
     }
@@ -85,7 +93,7 @@ void xform(op_t &op, op_t &outop) {
                 ++outop.char_offset;
             }
             else {
-                /* should not happen! */
+                /* should never happen! */
                 cerr << "WARNING: IDs should not be same" << endl;
             }
         }
@@ -93,6 +101,8 @@ void xform(op_t &op, op_t &outop) {
                  && op.char_offset == outop.char_offset) */
         {
             /* insert same char, do nothing */
+            op.operation = NOOP;
+            return 1;
         }
     }
     else {
@@ -101,11 +111,12 @@ void xform(op_t &op, op_t &outop) {
              << (char)op.operation << ", " << (char)outop.operation
              << endl;
     }
+    return 0;
 }
 
 void printError(const op_t &op) {
-    cerr << "---operation: " << (char)-op.operation;
-    if (isupper(-op.operation)) {
+    cerr << "---operation: " << (char)op.operation;
+    if (isupper(op.operation)) {
         cerr << "\n---offset: " << op.char_offset << endl;
     }
     else {
@@ -132,15 +143,16 @@ void errorCheck(int fd, const op_t &orig_op) {
     if (num_read == sizeof(msg)) {
         if (msg.op.operation < 0) {
             cerr << "FATAL: writing server op: transmission error\n";
+            msg.op.operation = -msg.op.operation;
             printError(msg.op);
+            cerr << "---state: (" << msg.state.client << ", "
+                 << msg.state.client << ")" << endl;
         }
-        cerr << "---state: (" << msg.state.client << ", "
-             << msg.state.client << ")" << endl;
     }
     else if (num_read == sizeof(op_t)) {
         if (msg.op.operation < 0) {
-            cerr << "FATAL: writing local op: invalid operation or "
-                    "offset out of range\n";
+            cerr << "FATAL: writing local op: offset out of range\n";
+            msg.op.operation = -msg.op.operation;
             printError(msg.op);
         }
         else if ((msg.op.operation == CH_DELETE
@@ -171,24 +183,33 @@ void errorCheck(int fd, const op_t &orig_op) {
     }
 }
 
-void Generate(op_t &op) {
-    trans_t msg;
-    msg.op = op;
-    msg.state = state;
-    if (sleep_before_send) {
-        sleep(sleep_before_send);
-    }
+void writeServer(const trans_t &msg) {
     if (write(TO_SERVER_FILENO, &msg, sizeof(msg)) != -1) {
         errorCheck(SERVER_FEEDBACK_FILENO, msg.op);
     }
     else {
         cerr << "ERROR: writing server: " << strerror(errno) << endl;
     }
+}
+
+void Generate(const op_t &op) {
+    trans_t msg;
+    msg.op = op;
+    msg.state = state;
+    if (sleep_before_send == 0) {
+        /* synchronize immediately */
+        writeServer(msg);
+    }
+    else {
+        /* wait for sync event */
+        to_send.push(msg);
+    }
     outgoing.push_back(msg);
     ++state.client;
 }
 
 void Receive(trans_t &msg) {
+    #if USER_MAX <= 2
     /* Discard acknowledged messages. */
     for (list<trans_t>::iterator m = outgoing.begin();
          m != outgoing.end(); ++m)
@@ -200,53 +221,77 @@ void Receive(trans_t &msg) {
             m = pre;
         }
     }
+    #endif
     /* ASSERT msg.myMsgs == otherMsgs. */
     if (msg.state.client != state.server) {
-        cerr << "WARNING: msg.state.client != state.server" << endl;
+        cerr << "WARNING: msg.state.client (" << msg.state.client
+             << ") != state.server (" << state.server << ")\n";
     }
     for (list<trans_t>::iterator i = outgoing.begin();
          i != outgoing.end(); ++i)
     {
+        #if USER_MAX > 2
+        if (i->state.client < msg.state.server) {
+            continue;
+        }
+        #endif
         /* Transform new message and the ones in the queue. */
-        xform(msg.op, (*i).op);
+        if (xform(msg.op, (*i).op) != 0) {
+            break;
+        }
     }
-    if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {
-        errorCheck(LOCAL_FEEDBACK_FILENO, msg.op);
-    }
-    else {
-        cerr << "ERROR: writing local: " << strerror(errno) << endl;
+    if (msg.op.operation != NOOP) {
+        if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {
+            errorCheck(LOCAL_FEEDBACK_FILENO, msg.op);
+        }
+        else {
+            cerr << "ERROR: writing local: " << strerror(errno) << endl;
+        }
     }
     ++state.server;
+}
+
+int setNonblock(int fd) {
+    int flags = fcntl(fd, F_GETFL);
+    if (flags == -1) {
+        return -1;
+    }
+    flags &= ~O_NONBLOCK;
+    fcntl(fd, F_SETFL, flags);
+    return 0;
 }
 
 void initErrorCheck() {
     int errfds[] = {LOCAL_FEEDBACK_FILENO, SERVER_FEEDBACK_FILENO};
     for (int i = 0; i < SIZEOFARRAY(errfds); ++i) {
-        int flags = fcntl(errfds[i], F_GETFL);
-        if (flags == -1) {
+        if (setNonblock(errfds[i]) != 0) {
             error_check_disabled = true;
             cerr << "WARNING: error check disabled" << endl;
             return;
         }
-        flags &= ~O_NONBLOCK;
-        fcntl(errfds[i], F_SETFL, flags);
+    }
+}
+
+void synchronize() {
+    while (to_send.size()) {
+        const trans_t &t = to_send.front();
+        writeServer(t);
+        to_send.pop();
     }
 }
 
 int main(int argc, char *argv[]) {
     int opt;
-    int time;
     while ((opt = getopt(argc, argv, "t:")) != -1) {
         switch (opt) {
             case 't':
-                time = atoi(optarg);
-                if (time > 0) {
-                    sleep_before_send = time;
+                sleep_before_send = atoi(optarg);
+                if (sleep_before_send == 0 && optarg[0] != '0') {
+                    cerr << "WARNING: Invalid sleep time: "
+                         << optarg << endl;
                 }
-                else {
-                    cerr << "Invalid sleep time: " << optarg << endl;
-                    exit(EXIT_FAILURE);
-                }
+                break;
+            default:
                 break;
         }
     }
@@ -259,7 +304,20 @@ int main(int argc, char *argv[]) {
         cerr << "ERROR: signal: " << strerror(errno) << endl;
         exit(EXIT_FAILURE);
     }
-    while (poll(fds, SIZEOFARRAY(fds), -1) != -1 || errno == EINTR) {
+    int poll_ret, timeout;
+    if (sleep_before_send <= 0) {
+        timeout = -1;
+    }
+    else {
+        timeout = sleep_before_send;
+    }
+    while ((poll_ret = poll(fds, SIZEOFARRAY(fds), timeout)) != -1
+           || errno == EINTR) {
+        if (poll_ret == 0) {
+            /* timeout */
+            synchronize();
+            continue;
+        }
         int hup = 0;
         for (int i = 0; i < SIZEOFARRAY(fds); ++i) {
             if (fds[i].revents & POLLIN) {
@@ -267,7 +325,13 @@ int main(int argc, char *argv[]) {
                     if (read(fds[i].fd, &msg.op, sizeof(op_t))
                         == sizeof(op_t))
                     {
-                        Generate(msg.op);
+                        if (msg.op.operation == SYN) {
+                            /* user synchronism signal */
+                            synchronize();
+                        }
+                        else {
+                            Generate(msg.op);
+                        }
                     }
                 }
                 else if (fds[i].fd == FROM_SERVER_FILENO) {

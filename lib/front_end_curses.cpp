@@ -1386,10 +1386,27 @@ void gotoOff() {
     gotoPos(pos);
 }
 
+#define MOUSE_SCROLL_UP   02000000
+#define MOUSE_SCROLL_DOWN 01000000000
+
 /* mouse key, dont support scroll keys (due to ncurses 5 mouse mask) */
 void keyMouse() {
     MEVENT mouse_event;
     if (getmouse(&mouse_event) == OK) {
+        #if NCURSES_MOUSE_VERSION > 1
+        if (mouse_event.bstate & MOUSE_SCROLL_UP) {
+            for (int i = 0; i < 3; ++i) {
+                keyUp();
+            }
+            return;
+        }
+        else if (mouse_event.bstate & MOUSE_SCROLL_DOWN) {
+            for (int i = 0; i < 3; ++i) {
+                keyDown();
+            }
+            return;
+        }
+        #endif
         if (mouse_event.y >= TITLE_LINES
             && mouse_event.y < LINES - STATUS_LINES)
         {
@@ -1429,6 +1446,13 @@ struct {
 {"BUTTON4_CLICKED          ", BUTTON4_CLICKED        },
 {"BUTTON4_DOUBLE_CLICKED   ", BUTTON4_DOUBLE_CLICKED },
 {"BUTTON4_TRIPLE_CLICKED   ", BUTTON4_TRIPLE_CLICKED },
+#if NCURSES_MOUSE_VERSION > 1
+{"BUTTON5_PRESSED          ", BUTTON5_PRESSED        },
+{"BUTTON5_RELEASED         ", BUTTON5_RELEASED       },
+{"BUTTON5_CLICKED          ", BUTTON5_CLICKED        },
+{"BUTTON5_DOUBLE_CLICKED   ", BUTTON5_DOUBLE_CLICKED },
+{"BUTTON5_TRIPLE_CLICKED   ", BUTTON5_TRIPLE_CLICKED },
+#endif
 };
 */
 
@@ -1554,13 +1578,82 @@ void getHelp() {
     drawStatusMsgImm(NULL);
 }
 
+void calPos() {
+    const op_t *op;
+    while ((op = queuedOp(0)) != NULL) {
+        if (op->data == '\n' && op->pos.lineno < cur_pos.lineno) {
+            if (op->operation == INSERT) {
+                ++cur_pos.lineno;
+            }
+            else if (op->operation == DELETE) {
+                --cur_pos.lineno;
+                if (op->pos.lineno == cur_pos.lineno) {
+                    cur_pos.offset += op->pos.offset - 1;
+                }
+            }
+        }
+        else if (op->pos.lineno == cur_pos.lineno 
+                 && op->pos.offset <= cur_pos.offset)
+        {
+            if (op->operation == INSERT) {
+                if (op->data == '\n') {
+                    ++cur_pos.lineno;
+                    cur_pos.offset -= op->pos.offset - 1;
+                }
+                else {
+                    ++cur_pos.offset;
+                }
+            }
+            else if (op->operation == DELETE) {
+                if (op->pos.offset != cur_pos.offset) {
+                    --cur_pos.offset;
+                }
+            }
+        }
+    }
+    while (cur_pos.lineno >= screen_start_line + CONTENT_LINES) {
+        screen_start_line += HALF_HEIGHT;
+    }
+    if (screen_start_line > editing_file->getTotalLines()) {
+        screen_start_line = editing_file->getTotalLines() - HALF_HEIGHT;
+    }
+    while (cur_pos.lineno < screen_start_line) {
+        screen_start_line -= HALF_HEIGHT;
+    }
+    if (screen_start_line < 1) {
+        screen_start_line = 1;
+    }
+}
+
+void showOTexited(int status) {
+    string msg = "OT ";
+    if (WIFEXITED(status)) {
+        msg += "exited, status=" + to_string(WEXITSTATUS(status));
+    }
+    else if (WIFSIGNALED(status)) {
+        msg += "killed by signal " + to_string(WTERMSIG(status)) + " ("
+               + string(strsignal(WTERMSIG(status))) + ")";
+    }
+    else {
+        msg += "exited";
+    }
+    status_t tmp = { msg.c_str() };
+    redraw(RD_STMSG | SM_IMMEDIATE, &tmp);
+}
+
 /* control center */
 void control() {
     int ch;
-    mousemask(BUTTON1_PRESSED, NULL);
-    //mouseinterval(0);
+    #if NCURSES_MOUSE_VERSION > 1
+    mousemask(BUTTON1_PRESSED | BUTTON1_CLICKED 
+              | MOUSE_SCROLL_UP | MOUSE_SCROLL_DOWN, NULL);
+    mouseinterval(0);
+    #else
+    mousemask(BUTTON1_PRESSED | BUTTON1_CLICKED, NULL);
+    #endif
     /* test key codes */
     /*
+    mousemask(ALL_MOUSE_EVENTS, NULL);
     int i = 0;
     MEVENT mouse_event;
     while (i < sizeof(mouse_key_test) / sizeof(mouse_key_test[0])) {
@@ -1572,7 +1665,7 @@ void control() {
     while ((ch = wgetch(stdscr)) != 'q') {
         move(i, 0);
         clrtoeol();
-        printw("%d %s ", ch, keyname(ch));
+        printw("%d %s            ", ch, keyname(ch));
         if (ch == KEY_MOUSE) {
             if (getmouse(&mouse_event) == OK)
                 printw("%lo", mouse_event.bstate);
@@ -1606,14 +1699,22 @@ void control() {
     }
     redraw(RD_ALL);
     string call_result;
+    op_t syn;
+    memset(&syn, 0, sizeof(op_t));
+    syn.operation = SYN;
     while (true) {
         setTitleModifiedFlag();
-        timeout(100);
+        timeout(50);
         ch = getch();
         timeout(-1);
         if (buf_changed) {
             buf_changed = 0;
+            calPos();
             redraw();
+        }
+        if (ot_status != -1) {
+            showOTexited(ot_status);
+            ot_status = -1;
         }
         if (ch == ERR) {
             continue;
@@ -1697,6 +1798,7 @@ void control() {
                     keyEnd();
                     break;
                 case 'L': /* Refresh (redraw) the current screen */
+                    writeOpFifo(syn);
                     redraw(RD_ALL);
                     break;
                 case 'Z': /* Suspend the editor */

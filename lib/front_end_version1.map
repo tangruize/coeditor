@@ -7,6 +7,9 @@ VER_1 {
         buf_changed;
         write_op_pos;
         write_op;
+        front_end_number_version;
+        no_cli;
+        ot_status;
     local:
         *;    # Hide all other symbols
 };

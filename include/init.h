@@ -35,6 +35,9 @@ extern string to_server_feedback_fifo_name;
 extern string from_server_fifo_name;
 extern string server_addr;
 extern string lock_file;
+extern string ot_time_arg;
+extern bool remove_fifo_ot;
+extern bool no_debug;
 extern textOp *edit_file;
 
 void removeOutFileAtExit();
@@ -47,5 +50,6 @@ int creatCliInputFifo();
 void writeOpFifo(op_t &op);
 void init();
 string getCliInputFifoName();
+const op_t* queuedOp(int enqueue, op_t *op = NULL);
 
 #endif

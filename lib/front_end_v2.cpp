@@ -32,8 +32,10 @@ extern "C" {
 static const char interp[] __attribute__((section(".interp"))) = INTERP;
 
 volatile int buf_changed = 0;
+volatile int ot_status = -1;
 int write_op = 0;
 int write_op_pos = 0;
+int no_cli = 1;
 
 __asm__(".symver front_end_cli_version,front_end_version@VER_1");
 __asm__(".symver front_end_curses_version,front_end_version@@VER_2");
@@ -46,6 +48,7 @@ __asm__(".symver frontEndMain_V2,frontEndMain@@VER_2");
 
 const char *front_end_cli_version = "CLI 0.1";
 const char *front_end_cli_author = "Ruize Tang";
+int front_end_number_version = 2;
 
 const char *front_end_curses_version = "CURSES 1.1";
 
@@ -105,17 +108,15 @@ static void *fifoInputCli_thread(void *arg) {
     return NULL;
 }
 
-pthread_t main_thread_id;
 void frontEnd_V2(textOp &file) {
-#ifdef DEBUG
     redirectStderr();
-    if (creatCliInputFifo() == 0) {
+#ifdef DEBUG
+    if (!no_cli && creatCliInputFifo() == 0) {
         pthread_t t1;
         pthread_create(&t1, NULL, fifoInputCli_thread, &file);
     }
 #endif
     frontEndCurses(file);
-    main_thread_id = pthread_self();
 }
 
 }

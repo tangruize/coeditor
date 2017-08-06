@@ -43,13 +43,13 @@ void _err(prompt_t &errmsg, bool term, int lineno, const char *file);
 #define errMsg(msg) _err(msg, false, __LINE__, __FILE__)
 
 #define PROMPT_ERROR(msg) do { \
-        if (msg != NOERR) { \
+        if (msg != string(NOERR)) { \
             errMsg(msg); \
         } \
     } while(0)
 
 #define EXIT_ERROR(msg) do { \
-        if (msg != NOERR) { \
+        if (msg != string(NOERR)) { \
             errExit(msg); \
         } \
     } while(0)

@@ -31,7 +31,7 @@ clear
 rm -f ${PREFIX}*.local.op*
 
 # new terminal to run the instance
-gnome-terminal --title='coeditor' -e "$EXE"
+gnome-terminal --title='coeditor' -e "$EXE -old $*"
 
 # wait for creating relating file
 sleep 1

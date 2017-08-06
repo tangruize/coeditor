@@ -51,7 +51,7 @@ ${FRONT_END_CLI_LIB} : front_end_v1.o front_end_cli.o
 	ar r libfrontend.a.1.0.1 $^
 
 ${FRONT_END_CURSES_LIB} : front_end_v2.o front_end_cli.o front_end_curses.o
-	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version2.map -o $@ $^ -lncurses -pthread
+	${CXX} ${FRONT_END_CXXFLAGS} -Wl,--version-script,front_end_version2.map -o $@ $^ -lncurses -ldl -pthread
 	ar r libfrontend.a.1.1.1 $^
 
 libfrontend.so.1 : ${FRONT_END_CLI_LIB} ${FRONT_END_CURSES_LIB}

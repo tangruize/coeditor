@@ -23,11 +23,15 @@ extern "C" {
 
 static const char interp[] __attribute__((section(".interp"))) = INTERP;
 volatile int buf_changed = 0;
+volatile int ot_status = -1;
 int write_op = 1;
 int write_op_pos = 0;
+/* no effect */
+int no_cli;
 
 const char *front_end_version = "CLI 0.1";
 const char *front_end_author = "Ruize Tang";
+int front_end_number_version = 1;
 
 void frontEndCli(textOp &file, istream &in);
 

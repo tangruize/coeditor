@@ -28,6 +28,13 @@ static inline void shellPrompt() {
     }
 }
 
+static void enqueuePos(op_t &p) {
+    if (front_end_number_version > 1) {
+        buf_changed = 1;
+        queuedOp(1, &p);
+    } 
+}
+
 /* the front-end function */
 void frontEndCli(textOp &file, istream &in) {
     string line, cmd, data;
@@ -66,12 +73,14 @@ void frontEndCli(textOp &file, istream &in) {
         saved_op = op;
         switch (op.operation) {
             case CH_DELETE:
-                msg = file.deleteCharAt(offset, &delete_char);
+                msg = file.deleteCharAt(offset, &delete_char, &saved_op.pos);
                 PROMPT_ERROR(msg);
                 if (msg == NOERR) {
                     op.data = delete_char;
                     op.char_offset = offset;
-                    buf_changed = 1;
+                    saved_op.data = delete_char;
+                    saved_op.operation = DELETE;
+                    enqueuePos(saved_op);
                     if (write_op) {
                         writeOpFifo(op);
                     }
@@ -82,7 +91,7 @@ void frontEndCli(textOp &file, istream &in) {
                 PROMPT_ERROR(msg);
                 if (msg == NOERR) {
                     op.data = delete_char;
-                    buf_changed = 1;
+                    enqueuePos(op);
                     if (write_op) {
                         writeOpFifo(op);
                     }
@@ -121,7 +130,8 @@ void frontEndCli(textOp &file, istream &in) {
                 msg = file.insertChar(op.pos, (char)op.data);
                 PROMPT_ERROR(msg);
                 if (msg == NOERR) {
-                    buf_changed = 1;
+                    op.operation = INSERT;
+                    enqueuePos(op);
                     if (write_op) {
                         writeOpFifo(saved_op);
                     }

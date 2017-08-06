@@ -13,11 +13,9 @@
 
 #include <unistd.h>
 
-string server_addr;
-
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:pw")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:pwdol")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
@@ -28,12 +26,25 @@ int main(int argc, char *argv[]) {
             case 'w':
                 write_op = 1;
                 break;
+            case 't':
+                ot_time_arg = optarg;
+                break;
+            case 'o':
+                remove_fifo_ot = false;
+                break;
+            case 'd':
+                no_debug = false;
+                break;
+            case 'l':
+                no_cli = 0;
+                break;
             default:
                 cerr << "Invalid arguments" << endl;
                 exit(EXIT_FAILURE);
         }
     }
     textOpMutex file;
+//    textOp file;
     edit_file = &file;
     if (optind < argc) {
 //        auto msg = file.loadFile(argv[optind]);
