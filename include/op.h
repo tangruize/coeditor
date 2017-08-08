@@ -74,7 +74,7 @@ struct file_id_t {
  * | operation sequences, sizeof(trans_t) * n ...                      |
  *  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-#define USER_MAX 2
+#define USER_MAX 32
 #define SHM_OFFSET (sizeof(int) + USER_MAX * sizeof(file_id_t))
 
 #endif

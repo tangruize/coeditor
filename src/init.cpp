@@ -140,10 +140,10 @@ void redirectStderr() {
         debug_output_file_name = out_file_prefix + DEBUG_FILE_SUFFIX;
     }
     int fd = openat(edit_dir_fd, debug_output_file_name.c_str(),
-             O_CREAT | O_TRUNC | O_WRONLY | O_APPEND, 0644);
+             O_CREAT | O_TRUNC | O_WRONLY | O_APPEND, 0600);
     if (fd == -1) {
         debug_output_file_name  = TRASH_FILE;
-        fd = open(TRASH_FILE, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+        fd = open(TRASH_FILE, O_CREAT | O_TRUNC | O_WRONLY, 0600);
     }
 //    restoreOldCwd();
     if (dup2(fd, STDERR_FILENO) != STDERR_FILENO) {
@@ -155,7 +155,7 @@ void redirectStderr() {
 }
 
 int makeFifo(string &name) {
-    if (mkfifoat(edit_dir_fd, name.c_str(), 0644)) {
+    if (mkfifoat(edit_dir_fd, name.c_str(), 0600)) {
         name.clear();
         return -1;
     }
@@ -453,7 +453,7 @@ int checkFileLock() {
         return 0;
     }
     lock_file = out_file_prefix_no_pid + LOCK_FILE_SUFFIX;
-    int lock_file_fd = openat(edit_dir_fd, lock_file.c_str(), O_CREAT | O_RDWR, 0644);
+    int lock_file_fd = openat(edit_dir_fd, lock_file.c_str(), O_CREAT | O_RDWR, 0600);
     if (lock_file_fd == -1) {
         PROMPT_ERROR_EN("open: " + lock_file);
         exit(EXIT_FAILURE);
@@ -489,17 +489,19 @@ void tryOpen() {
             exit(EXIT_FAILURE);
         }
     }
-    struct stat sb;
-    if (fstat(tmpfd, &sb) == -1) {
-        PROMPT_ERROR_EN("Error stating " + edit_file->getFilename());
-        exit(EXIT_FAILURE);
+    else {
+        struct stat sb;
+        if (fstat(tmpfd, &sb) == -1) {
+            PROMPT_ERROR_EN("Error stating " + edit_file->getFilename());
+            exit(EXIT_FAILURE);
+        }
+        if (!S_ISREG(sb.st_mode)) {
+            cerr << "Error: not a regular file: " 
+                 << edit_file->getFilename() << endl;
+            exit(EXIT_FAILURE);
+        }
+        close(tmpfd);
     }
-    if (!S_ISREG(sb.st_mode)) {
-        cerr << "Error: not a regular file: " 
-             << edit_file->getFilename() << endl;
-        exit(EXIT_FAILURE);
-    }
-    close(tmpfd);
 }
 
 const op_t* queuedOp(int enqueue, op_t *op) {
@@ -567,8 +569,8 @@ void initSignal() {
 
 void initOt() {
     int fds[7] = {op_read_fd, op_in_write_fd, 2, server_out_read_fd, 
-                  server_in_write_fd, op_in_feedback_write_fd,
-                  server_in_feedback_write_fd};
+                  server_in_write_fd, op_in_feedback_read_fd,
+                  server_in_feedback_read_fd};
     int max = 2;
     for (int i = 0; i < 7; ++i) {
         if (fds[i] < 0) {
@@ -641,16 +643,18 @@ void init() {
     if (front_end_number_version > 1) {
         pos_to_transform = new queue<op_t>;
     }
-    creatOpOutputFifo();
-    if (creatOpInputFifo() == 0) {
-        creatOpInputFeedbackFifo();
-        pthread_t read_op_id;
-        int s = pthread_create(&read_op_id, NULL, readOp_Thread, NULL);
-        if (s != 0) {
-            close(op_in_read_fd);
-            close(op_in_write_fd);
-            deleteOutFile(op_input_fifo_name);
-            cerr << "OP input not started" << endl;
+    if (!remove_fifo_ot || server_addr.size()) {
+        creatOpOutputFifo();
+        if (creatOpInputFifo() == 0) {
+            creatOpInputFeedbackFifo();
+            pthread_t read_op_id;
+            int s = pthread_create(&read_op_id, NULL, readOp_Thread, NULL);
+            if (s != 0) {
+                close(op_in_read_fd);
+                close(op_in_write_fd);
+                deleteOutFile(op_input_fifo_name);
+                cerr << "OP input not started" << endl;
+            }
         }
     }
     if (server_addr.size()) {
@@ -664,7 +668,9 @@ void init() {
             program_id, 
             "d41d8cd98f00b204e9800998ecf8427e"
         };
-        if (edit_file->getFilename().size()) {
+        if (edit_file->getFilename().size()
+            && access(edit_file->getFilename().c_str(), R_OK) == 0)
+        {
             cerr << "Calculating '" << edit_file->getFilename()
                  << "' md5sum..." << endl;
             string md5sum_file = "/tmp/" + out_file_prefix + "md5sum";

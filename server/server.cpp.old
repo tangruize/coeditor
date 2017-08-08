@@ -123,12 +123,12 @@ void login() {
     ++n;
     pwrite(readfd, &n, sizeof(n), 0);
     releaseFileLock();
-    lseek(readfd, SEEK_SET, SHM_OFFSET);
+    lseek(readfd, SHM_OFFSET, SEEK_SET);
 }
 
 void logout() {
     /* _exit() in this function should not be called */
-    lseek(readfd, SEEK_SET, 0);
+    lseek(readfd, 0, SEEK_SET);
     getFileLock();
     int n = 0;
     read(readfd, &n, sizeof(n));

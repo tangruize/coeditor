@@ -6,10 +6,11 @@
 !_TAG_PROGRAM_VERSION	5.9~svn20110310	//
 BUILD_DIRS	Makefile	/^BUILD_DIRS = ${DIRS}$/;"	m
 Boolean	include/inet_sockets.h	/^typedef enum { FALSE, TRUE } Boolean;$/;"	t	typeref:enum:__anon4
+CACHE_FILE_SIZE	lib/front_end_curses.cpp	174;"	d	file:
 CH_DELETE	include/op.h	/^    CH_DELETE = 'D', CH_INSERT = 'I'$/;"	e	enum:__anon3
 CH_INSERT	include/op.h	/^    CH_DELETE = 'D', CH_INSERT = 'I'$/;"	e	enum:__anon3
 CLI_INPUT_SUFFIX	include/init.h	17;"	d
-CONTENT_LINES	lib/front_end_curses.cpp	39;"	d	file:
+CONTENT_LINES	lib/front_end_curses.cpp	40;"	d	file:
 DEBUG	include/error.h	15;"	d
 DEBUG_FILE_SUFFIX	include/init.h	16;"	d
 DEFAULT_PS	lib/front_end_cli.cpp	22;"	d	file:
@@ -22,7 +23,7 @@ EXE	src/Makefile	/^EXE = ..\/coeditor$/;"	m
 EXIT_ERROR	include/error.h	51;"	d
 FALSE	include/inet_sockets.h	/^typedef enum { FALSE, TRUE } Boolean;$/;"	e	enum:__anon4
 FALSE	include/inet_sockets.h	29;"	d
-FOLD_PRE_NUM	lib/front_end_curses.cpp	43;"	d	file:
+FOLD_PRE_NUM	lib/front_end_curses.cpp	44;"	d	file:
 FROM_LOCAL_FILENO	ot/main.cpp	20;"	d	file:
 FROM_SERVER_FILENO	ot/main.cpp	23;"	d	file:
 FROM_SERVER_SUFFIX	include/init.h	23;"	d
@@ -34,7 +35,7 @@ FRONT_END_STATIC_DEFAULT	lib/Makefile	/^FRONT_END_STATIC_DEFAULT = libfrontend.a
 GP_OFFSET	lib/front_end_curses.cpp	/^enum {GP_POS, GP_OFFSET};$/;"	e	enum:__anon1	file:
 GP_POS	lib/front_end_curses.cpp	/^enum {GP_POS, GP_OFFSET};$/;"	e	enum:__anon1	file:
 Generate	ot/main.cpp	/^void Generate(const op_t &op) {$/;"	f
-HALF_HEIGHT	lib/front_end_curses.cpp	40;"	d	file:
+HALF_HEIGHT	lib/front_end_curses.cpp	41;"	d	file:
 INET_CXXFLAGS	lib/Makefile	/^INET_CXXFLAGS := ${CXXFLAGS} -shared \\$/;"	m
 INET_SOCKETS_H	include/inet_sockets.h	18;"	d
 INSERT	include/op.h	/^    DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's',$/;"	e	enum:__anon3
@@ -50,11 +51,12 @@ LIB_DIR	server/Makefile	/^LIB_DIR = ..\/lib$/;"	m
 LIB_DIR	src/Makefile	/^LIB_DIR = ..\/lib$/;"	m
 LOCAL_FEEDBACK_FILENO	ot/main.cpp	25;"	d	file:
 LOCK_FILE_SUFFIX	include/init.h	24;"	d
+MAX_RECORDS	lib/front_end_curses.cpp	173;"	d	file:
 MD5SUM_SIZE	include/op.h	52;"	d
-MIN_COL	lib/front_end_curses.cpp	33;"	d	file:
-MIN_ROW	lib/front_end_curses.cpp	34;"	d	file:
-MOUSE_SCROLL_DOWN	lib/front_end_curses.cpp	1390;"	d	file:
-MOUSE_SCROLL_UP	lib/front_end_curses.cpp	1389;"	d	file:
+MIN_COL	lib/front_end_curses.cpp	34;"	d	file:
+MIN_ROW	lib/front_end_curses.cpp	35;"	d	file:
+MOUSE_SCROLL_DOWN	lib/front_end_curses.cpp	1479;"	d	file:
+MOUSE_SCROLL_UP	lib/front_end_curses.cpp	1478;"	d	file:
 NDEBUG	include/error.h	18;"	d
 NDEBUG	include/error.h	21;"	d
 NOERR	include/error.h	31;"	d
@@ -68,29 +70,29 @@ PRINT	include/op.h	/^    DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's',$/;
 PROMPT_ERROR	include/error.h	45;"	d
 PROMPT_ERROR_EN	include/error.h	57;"	d
 RDWRN_H	include/rdwrn.h	18;"	d
-RD_ALL	lib/front_end_curses.cpp	611;"	d	file:
-RD_CONTENT	lib/front_end_curses.cpp	612;"	d	file:
-RD_MASK	lib/front_end_curses.cpp	616;"	d	file:
-RD_STBAR	lib/front_end_curses.cpp	614;"	d	file:
-RD_STMSG	lib/front_end_curses.cpp	615;"	d	file:
-RD_TITLE	lib/front_end_curses.cpp	613;"	d	file:
+RD_ALL	lib/front_end_curses.cpp	700;"	d	file:
+RD_CONTENT	lib/front_end_curses.cpp	701;"	d	file:
+RD_MASK	lib/front_end_curses.cpp	705;"	d	file:
+RD_STBAR	lib/front_end_curses.cpp	703;"	d	file:
+RD_STMSG	lib/front_end_curses.cpp	704;"	d	file:
+RD_TITLE	lib/front_end_curses.cpp	702;"	d	file:
 Receive	ot/main.cpp	/^void Receive(trans_t &msg) {$/;"	f
 SAVE	include/op.h	/^    DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's',$/;"	e	enum:__anon3
 SERVER_FEEDBACK_FILENO	ot/main.cpp	26;"	d	file:
 SHM_OFFSET	include/op.h	78;"	d
 SIZEOFARRAY	ot/main.cpp	28;"	d	file:
-SM_IMMEDIATE	lib/front_end_curses.cpp	559;"	d	file:
-SM_MASK	lib/front_end_curses.cpp	562;"	d	file:
-SM_ONECHAR	lib/front_end_curses.cpp	560;"	d	file:
-SM_STRING	lib/front_end_curses.cpp	561;"	d	file:
+SM_IMMEDIATE	lib/front_end_curses.cpp	648;"	d	file:
+SM_MASK	lib/front_end_curses.cpp	651;"	d	file:
+SM_ONECHAR	lib/front_end_curses.cpp	649;"	d	file:
+SM_STRING	lib/front_end_curses.cpp	650;"	d	file:
 SRC	lib/Makefile	/^SRC = $(wildcard *.cpp)$/;"	m
 SRC	ot/Makefile	/^SRC = $(wildcard *.cpp)$/;"	m
 SRC	server/Makefile	/^SRC = $(wildcard *.cpp)$/;"	m
 SRC	src/Makefile	/^SRC = $(wildcard *.cpp)$/;"	m
 SRC_NO_MAIN	src/Makefile	/^SRC_NO_MAIN = $(shell find . -type f -name '*.cpp' ! -name main.cpp ! -name init.cpp)$/;"	m
-STATUS_LINES	lib/front_end_curses.cpp	38;"	d	file:
+STATUS_LINES	lib/front_end_curses.cpp	39;"	d	file:
 SYN	include/op.h	/^    NOOP = 0, SYN = 0,$/;"	e	enum:__anon3
-TITLE_LINES	lib/front_end_curses.cpp	37;"	d	file:
+TITLE_LINES	lib/front_end_curses.cpp	38;"	d	file:
 TO_LOCAL_FILENO	ot/main.cpp	21;"	d	file:
 TO_SERVER_FEEDBACK_SUFFIX	include/init.h	22;"	d
 TO_SERVER_FILENO	ot/main.cpp	24;"	d	file:
@@ -99,7 +101,7 @@ TRASH_FILE	src/init.cpp	31;"	d	file:
 TRUE	include/inet_sockets.h	/^typedef enum { FALSE, TRUE } Boolean;$/;"	e	enum:__anon4
 TRUE	include/inet_sockets.h	25;"	d
 USER_MAX	include/op.h	77;"	d
-VERSION	lib/front_end_curses.cpp	26;"	d	file:
+VERSION	lib/front_end_curses.cpp	27;"	d	file:
 _COMMON_H	include/common.h	10;"	d
 _DEFAULT_SOURCE	lib/inet_sockets.cpp	19;"	d	file:
 _ERROR_H	include/error.h	10;"	d
@@ -111,7 +113,7 @@ _TEXT_H	include/text.h	10;"	d
 _TEXT_MUTEX_H	include/text_mutex.h	10;"	d
 _err	src/error.cpp	/^void _err(prompt_t &errmsg, bool term, int lineno, const char *file) {$/;"	f
 another_name_msgs	lib/front_end_curses.cpp	/^static status_t another_name_msgs = {$/;"	v	file:
-auth	server/server.cpp	/^auth_t auth;$/;"	v
+auth	server/multi_client_server.cpp	/^auth_t auth;$/;"	v
 auth_t	include/op.h	/^struct auth_t {$/;"	s
 author	lib/front_end_v2.cpp	/^static char author[PAD_SIZE] = {0};$/;"	v	file:
 backupFile	lib/front_end_curses.cpp	/^prompt_t backupFile(const string &n = "") {$/;"	f
@@ -119,6 +121,9 @@ banner	lib/front_end_v2.cpp	/^const char *banner[] = {$/;"	v
 buf_changed	include/front_end.h	/^extern "C" volatile int buf_changed;$/;"	v
 buf_changed	lib/front_end_v1.cpp	/^volatile int buf_changed = 0;$/;"	v
 buf_changed	lib/front_end_v2.cpp	/^volatile int buf_changed = 0;$/;"	v
+cache_file	lib/front_end_curses.cpp	/^static string cache_file;$/;"	v	file:
+cache_file_offset	lib/front_end_curses.cpp	/^static off_t cache_file_offset = CACHE_FILE_SIZE;$/;"	v	file:
+cache_file_sb	lib/front_end_curses.cpp	/^static struct stat cache_file_sb;$/;"	v	typeref:struct:stat	file:
 calCurLine	lib/front_end_curses.cpp	/^string calCurLine() {$/;"	f
 calPos	lib/front_end_curses.cpp	/^void calPos() {$/;"	f
 cancelled	lib/front_end_curses.cpp	/^static status_t cancelled = { "Cancelled" };$/;"	v	file:
@@ -172,11 +177,17 @@ error_check_disabled	ot/main.cpp	/^static bool error_check_disabled = false;$/;"
 exitEditor	lib/front_end_curses.cpp	/^int exitEditor() {$/;"	f
 exit_msgs	lib/front_end_curses.cpp	/^static status_t exit_msgs = {$/;"	v	file:
 fds	ot/main.cpp	/^struct pollfd fds[] = {$/;"	v	typeref:struct:pollfd
+fi_cpos	lib/front_end_curses.cpp	/^    pos_t fi_cpos;$/;"	m	struct:file_id	file:
+fi_dev	lib/front_end_curses.cpp	/^    dev_t fi_dev;$/;"	m	struct:file_id	file:
+fi_ino	lib/front_end_curses.cpp	/^    ino_t fi_ino;$/;"	m	struct:file_id	file:
+fi_off	lib/front_end_curses.cpp	/^    uint64_t fi_off;$/;"	m	struct:file_id	file:
+fi_scl	lib/front_end_curses.cpp	/^    int fi_scl;$/;"	m	struct:file_id	file:
 fifoInputCli_thread	lib/front_end_v2.cpp	/^static void *fifoInputCli_thread(void *arg) {$/;"	f	file:
+file_id	lib/front_end_curses.cpp	/^struct file_id {$/;"	s	file:
 file_id_t	include/op.h	/^struct file_id_t {$/;"	s
 file_name	include/text.h	/^    string file_name;$/;"	m	class:textOp
 file_t	include/text.h	/^typedef list<linestruct> file_t;$/;"	t
-filename	server/server.cpp	/^string filename = "\/tmp\/jupiter-server-";$/;"	v
+filename	server/multi_client_server.cpp	/^string filename = "\/tmp\/jupiter-server-";$/;"	v
 from_server_fifo_name	src/definations.cpp	/^string from_server_fifo_name;$/;"	v
 frontEnd	lib/front_end_v1.cpp	/^void frontEnd(textOp &file) {$/;"	f
 frontEndCli	lib/front_end_cli.cpp	/^void frontEndCli(textOp &file, istream &in) {$/;"	f
@@ -198,7 +209,7 @@ front_end_number_version	lib/front_end_v2.cpp	/^int front_end_number_version = 2
 front_end_version	include/front_end.h	/^extern "C" const char *front_end_version;$/;"	v
 front_end_version	lib/front_end_v1.cpp	/^const char *front_end_version = "CLI 0.1";$/;"	v
 getCliInputFifoName	src/init.cpp	/^string getCliInputFifoName() {$/;"	f
-getFileLock	server/server.cpp	/^void getFileLock() {$/;"	f
+getFileLock	server/multi_client_server.cpp	/^void getFileLock() {$/;"	f
 getFilename	include/text.h	/^    string getFilename() const {$/;"	f	class:textOp
 getHelp	lib/front_end_curses.cpp	/^void getHelp() {$/;"	f
 getTotalChars	include/text.h	/^    int getTotalChars() const {$/;"	f	class:textOp
@@ -246,17 +257,18 @@ keyLeft	lib/front_end_curses.cpp	/^void keyLeft() {$/;"	f
 keyMouse	lib/front_end_curses.cpp	/^void keyMouse() {$/;"	f
 keyRight	lib/front_end_curses.cpp	/^void keyRight() {$/;"	f
 keyUp	lib/front_end_curses.cpp	/^void keyUp() {$/;"	f
+last_state	server/multi_client_server.cpp	/^off_t last_state = SHM_OFFSET;$/;"	v
 line	include/text.h	/^    string line;$/;"	m	struct:linestruct
 lineno	include/op.h	/^    int lineno;$/;"	m	struct:pos_t
 linestruct	include/text.h	/^struct linestruct {$/;"	s
 loadFile	src/text.cpp	/^prompt_t textOp::loadFile(const string &filename) {$/;"	f	class:textOp
 locateLine	src/text.cpp	/^file_t::iterator textOp::locateLine(int no) {$/;"	f	class:textOp
 lock_file	src/definations.cpp	/^string lock_file;$/;"	v
-logExitInfo	server/server.cpp	/^void logExitInfo() {$/;"	f
-login	server/server.cpp	/^void login() {$/;"	f
-logout	server/server.cpp	/^void logout() {$/;"	f
+logExitInfo	server/multi_client_server.cpp	/^void logExitInfo() {$/;"	f
+login	server/multi_client_server.cpp	/^void login() {$/;"	f
+logout	server/multi_client_server.cpp	/^void logout() {$/;"	f
 main	ot/main.cpp	/^int main(int argc, char *argv[]) {$/;"	f
-main	server/server.cpp	/^int main(int argc, char *argv[]) {$/;"	f
+main	server/multi_client_server.cpp	/^int main(int argc, char *argv[]) {$/;"	f
 main	src/main.cpp	/^int main(int argc, char *argv[]) {$/;"	f
 main_msgs	lib/front_end_curses.cpp	/^static status_t main_msgs = {$/;"	v	file:
 makeFifo	src/init.cpp	/^int makeFifo(string &name) {$/;"	f
@@ -271,7 +283,7 @@ no_cli	include/front_end.h	/^extern "C" int no_cli;$/;"	v
 no_cli	lib/front_end_v1.cpp	/^int no_cli;$/;"	v
 no_cli	lib/front_end_v2.cpp	/^int no_cli = 1;$/;"	v
 no_debug	src/definations.cpp	/^bool no_debug = true;$/;"	v
-notifyOtherServers	server/server.cpp	/^void notifyOtherServers() {$/;"	f
+notifyOtherServers	server/multi_client_server.cpp	/^void notifyOtherServers() {$/;"	f
 offset	include/op.h	/^    int offset;$/;"	m	struct:pos_t
 old_cwd_fd	src/init.cpp	/^static int old_cwd_fd = -1;$/;"	v	file:
 op	include/op.h	/^    op_t op;$/;"	m	struct:trans_t
@@ -289,7 +301,7 @@ openFifos	src/init.cpp	/^int openFifos(string &name, int &readfd, int &writefd) 
 operation	include/op.h	/^    char operation; \/* exclude PRINT and SAVE *\/$/;"	m	struct:op_t
 ot_status	include/front_end.h	/^extern "C" volatile int ot_status;$/;"	v
 ot_status	lib/front_end_v1.cpp	/^volatile int ot_status = -1;$/;"	v
-ot_status	lib/front_end_v2.cpp	/^volatile int ot_status = 0;$/;"	v
+ot_status	lib/front_end_v2.cpp	/^volatile int ot_status = -1;$/;"	v
 ot_time_arg	src/definations.cpp	/^string ot_time_arg;$/;"	v
 out_file_prefix	src/init.cpp	/^string out_file_prefix;$/;"	v
 out_file_prefix_no_pid	src/init.cpp	/^string out_file_prefix_no_pid = OUT_FILE_PREFIX;$/;"	v
@@ -304,15 +316,16 @@ printBanner	lib/front_end_v2.cpp	/^void printBanner() {$/;"	f
 printCurPos	lib/front_end_curses.cpp	/^void printCurPos() {$/;"	f
 printError	ot/main.cpp	/^void printError(const op_t &op) {$/;"	f
 printLines	src/text.cpp	/^void textOp::printLines(int start, int count, bool lineno) {$/;"	f	class:textOp
-prog_id	server/server.cpp	/^pid_t prog_id;$/;"	v
+prog_id	server/multi_client_server.cpp	/^pid_t prog_id;$/;"	v
 program_id	src/init.cpp	/^user_id_t program_id;$/;"	v
 prompt_t	include/error.h	/^typedef const string prompt_t;$/;"	t
 ps	lib/front_end_cli.cpp	/^static string ps = DEFAULT_PS;$/;"	v	file:
 queuedOp	src/init.cpp	/^const op_t* queuedOp(int enqueue, op_t *op) {$/;"	f
+readCacheFile	lib/front_end_curses.cpp	/^void readCacheFile() {$/;"	f
 readOpInFifo	src/init.cpp	/^int readOpInFifo(op_t &op) {$/;"	f
 readOp_Thread	src/init.cpp	/^void *readOp_Thread(void *args) {$/;"	f
 read_server_thread	src/init.cpp	/^void *read_server_thread(void *args) {$/;"	f
-readfd	server/server.cpp	/^int readfd = -1, writefd = -1;$/;"	v
+readfd	server/multi_client_server.cpp	/^int readfd = -1, writefd = -1;$/;"	v
 readn	lib/rdwrn.cpp	/^readn(int fd, void *buffer, size_t n)$/;"	f
 readonly_flag	lib/front_end_curses.cpp	/^bool readonly_flag = false;$/;"	v
 redirectStderr	src/init.cpp	/^void redirectStderr() {$/;"	f
@@ -320,7 +333,7 @@ redraw	lib/front_end_curses.cpp	/^prompt_t redraw(int type = RD_CONTENT, status_
 redrawContent	lib/front_end_curses.cpp	/^void redrawContent() {$/;"	f
 redrawCurLine	lib/front_end_curses.cpp	/^void redrawCurLine() {$/;"	f
 redrawTitle	lib/front_end_curses.cpp	/^void redrawTitle() {$/;"	f
-releaseFileLock	server/server.cpp	/^void releaseFileLock() {$/;"	f
+releaseFileLock	server/multi_client_server.cpp	/^void releaseFileLock() {$/;"	f
 removeFifos	src/init.cpp	/^void removeFifos() {$/;"	f
 removeOutFileAtExit	src/init.cpp	/^void removeOutFileAtExit() {$/;"	f
 remove_fifo_ot	src/definations.cpp	/^bool remove_fifo_ot = true;$/;"	v
@@ -367,6 +380,7 @@ to_server_feedback_fifo_name	src/definations.cpp	/^string to_server_feedback_fif
 to_server_fifo_name	src/definations.cpp	/^string to_server_fifo_name;$/;"	v
 total_chars	include/text.h	/^    uint64_t total_chars;$/;"	m	class:textOp
 trans_t	include/op.h	/^struct trans_t {$/;"	s
+transform	server/multi_client_server.cpp	/^void transform(op_t *op) {$/;"	f
 translateOffset	src/text.cpp	/^pos_t textOp::translateOffset(uint64_t offset) {$/;"	f	class:textOp
 translatePos	src/text.cpp	/^uint64_t textOp::translatePos(const pos_t pos) {$/;"	f	class:textOp
 tryOpen	src/init.cpp	/^void tryOpen() {$/;"	f
@@ -377,7 +391,8 @@ user_id_t	include/op.h	/^typedef short user_id_t;$/;"	t
 version	lib/front_end_v2.cpp	/^static char version[PAD_SIZE] = {0};$/;"	v	file:
 whereIs	lib/front_end_curses.cpp	/^void whereIs() {$/;"	f
 writeAndShowMsg	lib/front_end_curses.cpp	/^int writeAndShowMsg(const string &s, const string &write_mode,$/;"	f
-writeClient	server/server.cpp	/^void writeClient(int sig) {$/;"	f
+writeCacheFile	lib/front_end_curses.cpp	/^void writeCacheFile() {$/;"	f
+writeClient	server/multi_client_server.cpp	/^void writeClient(int sig) {$/;"	f
 writeOpFifo	src/init.cpp	/^void writeOpFifo(op_t &op) {$/;"	f
 writeOut	lib/front_end_curses.cpp	/^int writeOut() {$/;"	f
 writeServer	ot/main.cpp	/^void writeServer(const trans_t &msg) {$/;"	f
@@ -394,8 +409,9 @@ write_out_msgs	lib/front_end_curses.cpp	/^static status_t write_out_msgs = {$/;"
 write_prepend	lib/front_end_curses.cpp	/^const char *write_prepend = "File Name to Prepend to";$/;"	v
 write_server_thread	src/init.cpp	/^void *write_server_thread(void *args) {$/;"	f
 write_str	lib/front_end_curses.cpp	/^char write_str[40] = "File Name to Write:";$/;"	v
-writefd	server/server.cpp	/^int readfd = -1, writefd = -1;$/;"	v
+writefd	server/multi_client_server.cpp	/^int readfd = -1, writefd = -1;$/;"	v
 writen	lib/rdwrn.cpp	/^writen(int fd, const void *buffer, size_t n)$/;"	f
 xform	ot/main.cpp	/^int xform(op_t &op, op_t &outop) {$/;"	f
+xform	server/xform.cpp	/^int xform(op_t &op, op_t &outop) {$/;"	f
 ~textOp	include/text.h	/^    virtual ~textOp() {}$/;"	f	class:textOp
 ~textOpMutex	include/text_mutex.h	/^    virtual ~textOpMutex() {}$/;"	f	class:textOpMutex

@@ -26,27 +26,32 @@ Coeditor help text
 ^A            Go to beginning of current line
 ^E            Go to end of current line
 
+^L            Refresh screen and synchronize ops immediately
+
 
 Coeditor command line arguments
 
  Invoke Coeditor without any arguments will create a new buf, and you can save
  your modifications later.  If you provide a file name, Coeditor will check
- file existence, permissions and whether it was opened by another Coeditor or
- not.  If file does not exist, Coeditor will create it while saving. 
+ file existence and permissions.  If file does not exist, Coeditor will create
+ it while saving. 
 
- Coeditor support 3 options up to now:
+ Coeditor support 7 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
 -w                       CLI command also writes OP ouput pipe (default not)
 -p                       OP ouput using (row, col) instead of file offset
+-o                       Invoke OT program manually
+-l                       Start CLI thread
+-d                       Start debug mode
+-t                       deliver to OT (sleep time before sending)
 
 
 Coeditor opened files description
 
- Coeditor creates sevaral files.  They are named with ".coeditor.[FILENAME]." 
- prefix.  If the editing file exists, a file with suffix "lock" will be
- created.  LOCK file records Coeditor PID and prevents another Coeditor edits
- the file.  Other opened files add Coeditor PID as prefix.
+ Coeditor creates sevaral files.  They are named with ".coeditor.[FILENAME].
+ [PID]." prefix.  You need invoke program with "-old" arguments to get all
+ entries of below files.
 
  SUFFIX explanation: 
  [PW] for pipe write end, [PR] for pipe read end, [F] for regular file

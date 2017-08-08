@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() */
+#include <pwd.h>
 
 #define VERSION "1.1"
 
@@ -159,6 +160,141 @@ static status_t cancelled = { "Cancelled" };
 static status_t unknown_command = { "Unknown command" };
 
 static status_t unimplemented = { "Unimplemented" };
+
+struct file_id {
+    dev_t fi_dev;
+    ino_t fi_ino;
+    int fi_scl;
+    pos_t fi_cpos;
+    uint64_t fi_off;
+} __attribute__((packed));
+
+/* read offset since we last edit */
+#define MAX_RECORDS 28
+#define CACHE_FILE_SIZE  (sizeof(file_id) * MAX_RECORDS)
+bool isNewFile() {
+    if (!(editing_file->getFilename().size()
+       && access(editing_file->getFilename().c_str(), F_OK) == 0))
+    {
+        return true;
+    }
+    return false;
+}
+
+const char *setCachePath() {
+    static string cache_file;
+    if (cache_file.size()) {
+        return cache_file.c_str();
+    }
+    struct passwd *ps = getpwuid(getuid());
+    if (ps == NULL) {
+        return NULL;
+    }
+    cache_file = ps->pw_dir;
+    cache_file += "/.coeditor.cache";
+    if (truncate(cache_file.c_str(), CACHE_FILE_SIZE) == -1) {
+        cache_file.clear();
+        return NULL;
+    }
+    return cache_file.c_str();
+}
+
+struct stat *statSrcFile() {
+    static struct stat *cache_file_sb = NULL;
+    if (cache_file_sb) {
+        return cache_file_sb;
+    }
+    if (isNewFile()) {
+        return NULL;
+    }
+    static struct stat sb;
+    if (stat(editing_file->getFilename().c_str(), &sb) == -1) {
+        return NULL;
+    }
+    cache_file_sb = &sb;
+    return cache_file_sb;
+}
+
+struct file_id *loadCacheFile(int *n, int *cfd = NULL) {
+    struct stat *sb = statSrcFile();
+    if (sb == NULL) {
+        return NULL;
+    }
+    const char *cache_path = setCachePath();
+    if (cache_path == NULL) {
+        return NULL;
+    }
+    int fd = open(cache_path, O_RDWR | O_CREAT, 0600);
+    if (fd == -1) {
+        return NULL;
+    }
+    static char buf[CACHE_FILE_SIZE];
+    if (read(fd, buf, CACHE_FILE_SIZE) != CACHE_FILE_SIZE) {
+        return NULL;
+    }
+    if (n) {
+        *n = MAX_RECORDS;
+    }
+    struct file_id *p = (struct file_id *)buf;
+    for (int i = 0; i < MAX_RECORDS; ++i)
+    {
+        if (p[i].fi_dev == sb->st_dev && p[i].fi_ino == sb->st_ino) {
+            if (n) {
+                *n = i;
+            }
+            break;
+        }
+    }
+    if (cfd) {
+        *cfd = fd;
+    }
+    else {
+        close(fd);
+    }
+    return (struct file_id *)buf;
+}
+
+void readCacheFile() {
+    int n;
+    struct file_id *p = loadCacheFile(&n);
+    if (!p) {
+        return;
+    }
+    if (n != MAX_RECORDS) {
+        if (editing_file->getTotalChars() >= p[n].fi_off) {
+            screen_start_line = p[n].fi_scl;
+            cur_pos = p[n].fi_cpos;
+        }
+    }
+}
+
+/* WARNING: race condition (record lock can solve this problem) */
+void writeCacheFile() {
+    int n, fd;
+    struct file_id *p = loadCacheFile(&n, &fd);
+    if (!p) {
+        return;
+    }
+    struct stat *sb = statSrcFile();
+    if (sb == NULL) {
+        return;
+    }
+    struct file_id fi;
+    fi.fi_cpos = cur_pos;
+    fi.fi_scl = screen_start_line;
+    fi.fi_off = editing_file->translatePos(cur_pos);
+    fi.fi_dev = sb->st_dev;
+    fi.fi_ino = sb->st_ino;
+    if (n == MAX_RECORDS) {
+        --n;
+    }
+    for (; n >= 1; --n) {
+        p[n] = p[n - 1];
+    }
+    p[0] = fi;
+    pwrite(fd, p, CACHE_FILE_SIZE, 0);
+    close(fd);
+}
 
 /* init curses */
 void initCurses() {
@@ -1834,5 +1970,7 @@ void control() {
 extern "C" void frontEndCurses(textOp &file) {
     editing_file = &file;
     initCurses();
+    readCacheFile();
     control();
+    writeCacheFile();
 }
