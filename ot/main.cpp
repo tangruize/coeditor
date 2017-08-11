@@ -32,7 +32,7 @@ struct pollfd fds[] = {
     {FROM_SERVER_FILENO, POLLIN, 0},
 };
 
-state_t state;
+unsigned local, global;
 list<trans_t> outgoing;
 queue<trans_t> to_send;
 int sleep_before_send = 0;
@@ -40,6 +40,9 @@ int sleep_before_send = 0;
 int xform(op_t &op, op_t &outop) {
     if (op.operation == 0) {
         return 1;
+    }
+    else if (outop.operation == 0) {
+        return 0;
     }
     if (op.operation == CH_DELETE && outop.operation == CH_DELETE) {
         if (op.char_offset > outop.char_offset) {
@@ -51,6 +54,7 @@ int xform(op_t &op, op_t &outop) {
         else /* if (op.char_offset == outop.char_offset) */ {
             /* delete same char, do nothing */
             op.operation = NOOP;
+            outop.operation = NOOP;
             return 1;
         }
     }
@@ -71,7 +75,6 @@ int xform(op_t &op, op_t &outop) {
         else /* if (op.char_offset <= outop.char_offset) */ {
             ++outop.char_offset;
         }
-        
     }
     else if (op.operation == CH_INSERT && outop.operation
              == CH_INSERT)
@@ -102,6 +105,7 @@ int xform(op_t &op, op_t &outop) {
         {
             /* insert same char, do nothing */
             op.operation = NOOP;
+            outop.operation = NOOP;
             return 1;
         }
     }
@@ -115,20 +119,18 @@ int xform(op_t &op, op_t &outop) {
 }
 
 void printError(const op_t &op) {
-    cerr << "---operation: " << (char)op.operation;
+    cerr << (char)op.operation << " ";
     if (isupper(op.operation)) {
-        cerr << "\n---offset: " << op.char_offset << endl;
+        cerr << op.char_offset << " ";
     }
     else {
-        cerr << "\n---pos: (" << op.pos.lineno << ", "
-                     << op.pos.offset << ")\n";
+        cerr << op.pos.lineno << " " << op.pos.offset << " ";
     }
-    cerr << "---data: '";
     if (isprint(op.data)) {
-        cerr << op.data << "'\n";
+        cerr << op.data << "\n";
     }
     else {
-        cerr << "0x" << hex << uppercase << (unsigned)op.data << "'\n";
+        cerr << "0x" << hex << uppercase << (unsigned)op.data << "\n";
         cerr.unsetf(ios_base::hex);
     }
 }
@@ -142,27 +144,42 @@ void errorCheck(int fd, const op_t &orig_op) {
     ssize_t num_read = read(fd, &msg, sizeof(msg));
     if (num_read == sizeof(msg)) {
         if (msg.op.operation < 0) {
-            cerr << "FATAL: writing server op: transmission error\n";
+            cerr << "FATAL: writing server op: transmission error: ";
             msg.op.operation = -msg.op.operation;
             printError(msg.op);
-            cerr << "---state: (" << msg.state.client << ", "
-                 << msg.state.client << ")" << endl;
+            cerr << "---state: " << msg.state << endl;
         }
     }
     else if (num_read == sizeof(op_t)) {
         if (msg.op.operation < 0) {
-            cerr << "FATAL: writing local op: offset out of range\n";
             msg.op.operation = -msg.op.operation;
-            printError(msg.op);
+            if (msg.op.operation == 'I' || msg.op.operation == 'i'
+                || msg.op.operation == 'D' || msg.op.operation == 'd')
+            {
+                cerr << "FATAL: writing local op: offset out of range: ";
+                printError(msg.op);
+            }
+            else {
+                cerr << "FATAL: writing local op: invalid operation: ";
+                cerr.setf(ios_base::hex | ios_base::uppercase);
+                for (int i = 0; i < sizeof(op_t); ++i) {
+                    cerr << setw(2) << setfill('0') << (unsigned)((char *)&msg)[i];
+                    if (i % 2) {
+                        cerr << ' ';
+                    }
+                }
+                cerr << endl;
+                cerr.unsetf(ios_base::hex);
+            }
         }
         else if ((msg.op.operation == CH_DELETE
                  || msg.op.operation == DELETE)
                 && msg.op.data != orig_op.data)
         {
             cerr << "WARNING: data request to delete is different "
-                    "from what really deleted\n---ORIGINAL---\n";
+                    "from what really deleted\n---ORIGINAL: ";
             printError(orig_op);
-            cerr << "---FEEDBACK---\n";
+            cerr << "---FEEDBACK: ";
             printError(msg.op);
         }
     }
@@ -195,7 +212,7 @@ void writeServer(const trans_t &msg) {
 void Generate(const op_t &op) {
     trans_t msg;
     msg.op = op;
-    msg.state = state;
+    msg.state = global;
     if (sleep_before_send == 0) {
         /* synchronize immediately */
         writeServer(msg);
@@ -204,37 +221,31 @@ void Generate(const op_t &op) {
         /* wait for sync event */
         to_send.push(msg);
     }
+    msg.state = local;
     outgoing.push_back(msg);
-    ++state.client;
+    ++local;
 }
 
 void Receive(trans_t &msg) {
-    #if USER_MAX <= 2
     /* Discard acknowledged messages. */
     for (list<trans_t>::iterator m = outgoing.begin();
          m != outgoing.end(); ++m)
     {
-        if (m->state.client < msg.state.server) {
+        if (m->state < msg.state) {
             list<trans_t>::iterator pre = m;
             --pre;
             outgoing.erase(m);
             m = pre;
         }
     }
-    #endif
     /* ASSERT msg.myMsgs == otherMsgs. */
-    if (msg.state.client != state.server) {
+    /*if (msg.state.client != state.server) {
         cerr << "WARNING: msg.state.client (" << msg.state.client
              << ") != state.server (" << state.server << ")\n";
-    }
+    }*/
     for (list<trans_t>::iterator i = outgoing.begin();
          i != outgoing.end(); ++i)
     {
-        #if USER_MAX > 2
-        if (i->state.client < msg.state.server) {
-            continue;
-        }
-        #endif
         /* Transform new message and the ones in the queue. */
         if (xform(msg.op, (*i).op) != 0) {
             break;
@@ -248,7 +259,7 @@ void Receive(trans_t &msg) {
             cerr << "ERROR: writing local: " << strerror(errno) << endl;
         }
     }
-    ++state.server;
+    ++global;
 }
 
 int setNonblock(int fd) {

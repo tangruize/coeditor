@@ -9,6 +9,7 @@
 #include "op.h"
 #include "rdwrn.h"
 #include "common.h"
+#include <set>
 #include <syslog.h>
 #include <unistd.h>
 #include <limits.h>
@@ -27,7 +28,8 @@ string filename = "/tmp/jupiter-server-";
 auth_t auth;
 pid_t prog_id;
 int readfd = -1, writefd = -1;
-off_t last_state = SHM_OFFSET;
+unsigned local, global;
+list<trans_t> outgoing;
 
 int xform(op_t &op, op_t &outop);
 
@@ -74,6 +76,9 @@ void login() {
             }
         }
         /* file is surely created by us, truncate file */
+        if (ftruncate(readfd, 0) == -1) {
+            exit(EXIT_FAILURE);
+        }
         if (ftruncate(readfd, SHM_OFFSET) == -1) {
             exit(EXIT_FAILURE);
         }
@@ -86,6 +91,9 @@ void login() {
     getFileLock();
     int n = 0;
     if (read(readfd, &n, sizeof(n)) == 0 || n == 0) {
+        if (ftruncate(readfd, 0) == -1) {
+            exit(EXIT_FAILURE);
+        }
         if (ftruncate(readfd, SHM_OFFSET) == -1) {
             exit(EXIT_FAILURE);
         }
@@ -178,22 +186,34 @@ void notifyOtherServers() {
 
 void writeClient(int sig) {
     trans_t t;
-    ssize_t num_read;
-    while ((num_read = read(readfd, &t, sizeof(t))) == sizeof(t)) {
+    while (read(readfd, &t.op, sizeof(op_t)) == sizeof(op_t)) {
         if (t.op.id != auth.id) {
-            write(STDOUT_FILENO, &t, sizeof(t));
+            t.state = local;
+            writen(STDOUT_FILENO, &t, sizeof(t));
+            t.state = global;
+            outgoing.push_back(t);
+            ++global;
         }
     }
 }
 
-void transform(op_t *op) {
-    op_t tmp;
-    while (pread(readfd, &tmp, sizeof(op_t), last_state) > 0) {
-        if (xform(*op, tmp) != 0) {
+void transform(trans_t &loc) {
+    for (list<trans_t>::iterator m = outgoing.begin();
+         m != outgoing.end(); ++m)
+    {
+        if (m->state < loc.state) {
+            list<trans_t>::iterator pre = m;
+            --pre;
+            outgoing.erase(m);
+            m = pre;
+        }
+    }
+    for (list<trans_t>::iterator i = outgoing.begin();
+         i != outgoing.end(); ++i)
+    {
+        if (xform(loc.op, (*i).op) != 0) {
             break;
         }
-        pwrite(readfd, &tmp, sizeof(op_t), last_state);
-        last_state += sizeof(trans_t);
     }
 }
 
@@ -224,6 +244,7 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
+    writeClient(SIGHUP);
     /* set sighup handler */
     sigset_t block_set, prev_mask;
     sigemptyset(&block_set);
@@ -240,14 +261,14 @@ int main(int argc, char *argv[]) {
         getFileLock();
         /* block sighup while writing */
         sigprocmask(SIG_BLOCK, &block_set, &prev_mask);
-        transform(&data.op);
-        last_state = lseek(writefd, 0, SEEK_CUR);
-        if (data.op.operation != NOOP) {
-            if (write(writefd, &data, sizeof(trans_t)) != sizeof(trans_t)) {
-                exit(EXIT_FAILURE);
-            }
-            notifyOtherServers();
+        transform(data);
+        if (write(writefd, &data.op, sizeof(op_t))
+            != sizeof(op_t))
+        {
+            exit(EXIT_FAILURE);
         }
+        ++local;
+        notifyOtherServers();
         /* wake up other servers */
         sigprocmask(SIG_SETMASK, &prev_mask, NULL);
         releaseFileLock();

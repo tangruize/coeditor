@@ -41,6 +41,7 @@ echo "  i row col data"
 echo "  d row col"
 echo "  s filename"
 echo "  p [line [count]]"
+echo "  l (sync)"
 
 # remove all relating files
 rm -f ${PREFIX}*.debug ${PREFIX}*.cli ${PREFIX}*.local.op* ${PREFIX}*.server* ${EXE_DIR}/local_ops ${EXE_DIR}/server_ops
@@ -94,10 +95,12 @@ fi
 
 if [ -p "$SERVER_OP" ]; then
     gnome-terminal --title='from server' \
-        -e "bash -c \"cat $SERVER_OP | tee $EXE_DIR/server_ops | xxd -c 20\""
+        -e "bash -c \"cat $SERVER_OP | tee $EXE_DIR/server_ops | xxd -c 12\""
 fi
 
 if [ -p "$CLI_FILE" ]; then
     # write cli file
     cat > $CLI_FILE
 fi
+
+kill -INT $EXE_PID

@@ -27,6 +27,11 @@ Coeditor help text
 ^E            Go to end of current line
 
 ^L            Refresh screen and synchronize ops immediately
+^R            Troggle edit mode and view mode
+^D            Alternative Delete key
+^H            Alternative Backspace key
+
+^Z            Suspend the editor
 
 
 Coeditor command line arguments
@@ -36,25 +41,25 @@ Coeditor command line arguments
  file existence and permissions.  If file does not exist, Coeditor will create
  it while saving. 
 
- Coeditor support 7 options up to now:
+ Coeditor supports 7 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
+-t milliseconds          deliver to OT (delay time before sending)
 -w                       CLI command also writes OP ouput pipe (default not)
 -p                       OP ouput using (row, col) instead of file offset
 -o                       Invoke OT program manually
 -l                       Start CLI thread
--d                       Start debug mode
--t                       deliver to OT (sleep time before sending)
+-d                       Switch on debug mode
 
 
 Coeditor opened files description
 
- Coeditor creates sevaral files.  They are named with ".coeditor.[FILENAME].
+ Coeditor creates several files.  They are named with ".coeditor.[FILENAME].
  [PID]." prefix.  You need invoke program with "-old" arguments to get all
  entries of below files.
 
  SUFFIX explanation: 
- [PW] for pipe write end, [PR] for pipe read end, [F] for regular file
+ [PW] for pipe write end, [PR] for pipe read end, [F] for regular file.
  You should open PW in write-only mode and PR vice versa.
 
 [SUFFIX]                 [TYPE]  [DESCRIPTION]
@@ -80,6 +85,7 @@ i row col char           Insert charater at (row, col)
 
 p [lineno, [n]]          Print n lines from lineno
 s [filename]             Save to filename
+l                        Synchronize immediately
 
 
 Local I/O format
@@ -91,9 +97,10 @@ Local I/O format
 
 Server I/O format
 
- A server I/O is 20 byte in total.  For details, please see 'include/op.h'
- file.  If data writing to server.input is less than 20 bytes, zeros padded.
+ A server I/O is 16 byte in total.  For details, please see 'include/op.h'
+ file.  If data writing to server.input is less than 16 bytes, zeros padded.
  The feedback end is the same as Local I/O.
+
 
 Text format
 

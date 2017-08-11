@@ -38,14 +38,9 @@ enum {
     CH_DELETE = 'D', CH_INSERT = 'I'
 };
 
-struct state_t {
-    int client; /* local operation counter */
-    int server; /* remote operation counter */
-};
-
 struct trans_t {
     op_t op;
-    state_t state;
+    unsigned state;
 }__attribute__((packed));
 
 /* to authenticate while connecting server */

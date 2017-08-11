@@ -13,6 +13,9 @@ int xform(op_t &op, op_t &outop) {
     if (op.operation == 0) {
         return 1;
     }
+    else if (outop.operation == 0) {
+        return 0;
+    }
     if (op.operation == CH_DELETE && outop.operation == CH_DELETE) {
         if (op.char_offset > outop.char_offset) {
             --op.char_offset;
@@ -23,6 +26,7 @@ int xform(op_t &op, op_t &outop) {
         else /* if (op.char_offset == outop.char_offset) */ {
             /* delete same char, do nothing */
             op.operation = NOOP;
+            outop.operation = NOOP;
             return 1;
         }
     }
@@ -40,7 +44,7 @@ int xform(op_t &op, op_t &outop) {
         if (op.char_offset > outop.char_offset) {
             --op.char_offset;
         }
-        else /* if (op.char_offset <= outop.char_offset) */ {
+        else if (op.char_offset < outop.char_offset) {
             ++outop.char_offset;
         }
         
@@ -61,12 +65,8 @@ int xform(op_t &op, op_t &outop) {
             if (op.id > outop.id) {
                 ++op.char_offset;
             }
-            else if (op.id < outop.id) {
+            else /* if (op.id < outop.id) */ {
                 ++outop.char_offset;
-            }
-            else {
-                /* should never happen! */
-                syslog(LOG_WARNING, "WARNING: IDs should not be same");
             }
         }
         else /* if (op.data == outop.data
@@ -74,6 +74,7 @@ int xform(op_t &op, op_t &outop) {
         {
             /* insert same char, do nothing */
             op.operation = NOOP;
+            outop.operation = NOOP;
             return 1;
         }
     }

@@ -108,7 +108,7 @@ int restoreOldCwd() {
 void deleteOutFile(string &name, const string &ignore = "") {
     if (name.size() && name != ignore) {
         if (unlinkat(edit_dir_fd, name.c_str(), 0) == -1) {
-            PROMPT_ERROR_EN("unlink: " + name);
+            //PROMPT_ERROR_EN("unlink: " + name);
         }
         name.clear();
     }
@@ -339,20 +339,15 @@ void *readOp_Thread(void *args) {
             PROMPT_ERROR_EN("read op input fifo");
             break;
         }
-        char del_ch = 0;
         q_op = op;
         switch (op.operation) {
             case DELETE:
-                op_result = edit_file->deleteChar(op.pos, &del_ch);
-                op.data = del_ch;
-                q_op.data = del_ch;
+                op_result = edit_file->deleteChar(op.pos, &op.data);
                 break;
             case CH_DELETE:
                 op_result = edit_file->deleteCharAt(op.char_offset, 
-                                               &del_ch, &q_op.pos);
-                op.data = del_ch;
+                                               &op.data, &q_op.pos);
                 q_op.operation = DELETE;
-                q_op.data = del_ch;
                 break;
             case INSERT:
                 op_result = edit_file->insertChar(op.pos, op.data);
@@ -361,6 +356,8 @@ void *readOp_Thread(void *args) {
                 op_result = edit_file->insertCharAt(op.char_offset,
                                                op.data, &q_op.pos);
                 q_op.operation = INSERT;
+                break;
+            case NOOP:
                 break;
             default:
                 op_result = "FAILED";
@@ -374,7 +371,7 @@ void *readOp_Thread(void *args) {
             }
             PROMPT_ERROR(op_result);
         }
-        else if (front_end_number_version > 1) {
+        else if (front_end_number_version > 1 && q_op.operation != NOOP) {
             pos_to_transform->push(q_op);
             buf_changed = 1;
         }
@@ -694,7 +691,7 @@ void init() {
         }
         cerr << "Connecting " << server_addr << "..." << endl;
         if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
-            || read(socket_fd, &auth, sizeof(auth)) <=0)
+            || read(socket_fd, &auth, 1) <=0)
         {
             EXIT_ERROR("Error authenticating");
         }

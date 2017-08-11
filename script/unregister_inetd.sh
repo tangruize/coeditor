@@ -5,6 +5,11 @@ if [ "$USERNAME" != "root"  ]; then
     exit 1
 fi
 
-sed -i '/^jupiter.*/d' /etc/inetd.conf
+if which inetd &> /dev/null; then
+    sed -i '/^jupiter.*/d' /etc/inetd.conf
+    killall -HUP inetd
+elif which xinetd &> /dev/null; then
+    rm -f /etc/xinetd.d/jupiter
+    killall -HUP xinetd
+fi
 
-killall -HUP inetd

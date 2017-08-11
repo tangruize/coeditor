@@ -152,14 +152,12 @@ static status_t sure_prepend = {
 
 /* immediate message, the last 3 line */
 static status_t invalid_line = { "Invalid line or column number" };
-
 static status_t invalid_offset = { "Invalid offset" };
-
 static status_t cancelled = { "Cancelled" };
-
 static status_t unknown_command = { "Unknown command" };
-
 static status_t unimplemented = { "Unimplemented" };
+static status_t view_mode_msg = { "View mode" };
+static status_t edit_mode_msg = { "Edit mode" };
 
 struct file_id {
     dev_t fi_dev;
@@ -1838,6 +1836,7 @@ void control() {
     op_t syn;
     memset(&syn, 0, sizeof(op_t));
     syn.operation = SYN;
+    bool edit_mode = true;
     while (true) {
         setTitleModifiedFlag();
         timeout(50);
@@ -1885,10 +1884,17 @@ void control() {
                 redraw(RD_ALL);
                 break;
             case KEY_BACKSPACE:
-                keyBackspace();
+                if (edit_mode) {
+                    keyBackspace();
+                }
+                else {
+                    keyLeft();
+                }
                 break;
             case KEY_DC:
-                keyDelete();
+                if (edit_mode) {
+                    keyDelete();
+                }
                 break;
             case KEY_MOUSE:
                 keyMouse();
@@ -1898,7 +1904,9 @@ void control() {
         }
         /* insert */
         if (isprint(ch) || ch == '\n' || ch == '\t') {
-            insertChar(ch);
+            if (edit_mode) {
+                insertChar(ch);
+            }
         }
         /* ctrl keys */
         else if (ch <= 26) {
@@ -1957,6 +1965,28 @@ void control() {
                     break;
                 case 'G': /* Get help */
                     getHelp();
+                    break;
+                case 'D': /* delete */
+                    if (edit_mode) {
+                        keyDelete();
+                    }
+                    break;
+                case 'H': /* backspace */
+                    if (edit_mode) {
+                        keyBackspace();
+                    }
+                    else {
+                        keyLeft();
+                    }
+                    break;
+                case 'R': /* troggle view and edit mode */
+                    if (edit_mode) {
+                        redraw(RD_STMSG | SM_IMMEDIATE, &view_mode_msg);
+                    }
+                    else {
+                        redraw(RD_STMSG | SM_IMMEDIATE, &edit_mode_msg);
+                    }
+                    edit_mode = !edit_mode;
                     break;
                 default: /* Clear status message bar */
                     drawStatusMsgImm(NULL);
