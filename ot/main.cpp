@@ -119,20 +119,26 @@ int xform(op_t &op, op_t &outop) {
 }
 
 void printError(const op_t &op) {
-    cerr << (char)op.operation << " ";
-    if (isupper(op.operation)) {
-        cerr << op.char_offset << " ";
+    if (isalpha(op.operation)) {
+        cerr << (char)op.operation << " ";
     }
     else {
+        cerr << (unsigned)op.operation << " ";
+    }
+    if (islower(op.operation)) {
         cerr << op.pos.lineno << " " << op.pos.offset << " ";
     }
+    else {
+        cerr << op.char_offset << " ";
+    }
     if (isprint(op.data)) {
-        cerr << op.data << "\n";
+        cerr << op.data;
     }
     else {
-        cerr << "0x" << hex << uppercase << (unsigned)op.data << "\n";
+        cerr << "0x" << hex << uppercase << (unsigned)op.data;
         cerr.unsetf(ios_base::hex);
     }
+//    cerr << endl;
 }
 
 static bool error_check_disabled = false;
@@ -227,6 +233,9 @@ void Generate(const op_t &op) {
 }
 
 void Receive(trans_t &msg) {
+    cerr << "state: " << msg.state << ", ";
+    printError(msg.op);
+    cerr << endl;
     /* Discard acknowledged messages. */
     for (list<trans_t>::iterator m = outgoing.begin();
          m != outgoing.end(); ++m)
@@ -246,10 +255,25 @@ void Receive(trans_t &msg) {
     for (list<trans_t>::iterator i = outgoing.begin();
          i != outgoing.end(); ++i)
     {
+        cerr << "---before ot: ";
+        printError(msg.op);
+        cerr << " AND ";
+        printError((*i).op);
+        cerr << endl;
         /* Transform new message and the ones in the queue. */
         if (xform(msg.op, (*i).op) != 0) {
+            cerr << "---after  ot: ";
+            printError(msg.op);
+            cerr << " AND ";
+            printError((*i).op);
+            cerr << endl;
             break;
         }
+        cerr << "---after  ot: ";
+        printError(msg.op);
+        cerr << " AND ";
+        printError((*i).op);
+        cerr << endl;
     }
     if (msg.op.operation != NOOP) {
         if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {

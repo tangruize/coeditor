@@ -197,6 +197,34 @@ void writeClient(int sig) {
     }
 }
 
+#include <sstream>
+const char *strop(const op_t &op, char *buf2 = NULL) {
+    static char buf[32];
+    stringstream ss;
+    if (isalpha(op.operation)) {
+        ss << (char)op.operation;
+    }
+    else {
+        ss << (unsigned)op.operation;
+    }
+    ss << " ";
+    if (islower(op.operation)) {
+        ss << op.pos.lineno << " " << op.pos.offset << " ";
+    }
+    else {
+        ss << op.char_offset << " ";
+    }
+    ss << op.data;
+    if (buf2) {
+        ss.getline(buf2, 31);
+        return buf2;
+    }
+    else {
+        ss.getline(buf, 31);
+        return buf;
+    }
+}
+
 void transform(trans_t &loc) {
     for (list<trans_t>::iterator m = outgoing.begin();
          m != outgoing.end(); ++m)
@@ -208,12 +236,17 @@ void transform(trans_t &loc) {
             m = pre;
         }
     }
+    char buf[32];
+    syslog(LOG_INFO, "[%hd]state: %d, %s", auth.id, loc.state, strop(loc.op));
     for (list<trans_t>::iterator i = outgoing.begin();
          i != outgoing.end(); ++i)
     {
+        syslog(LOG_INFO, "---[%hd]before: %s AND %s", auth.id, strop(loc.op), strop((*i).op, buf));
         if (xform(loc.op, (*i).op) != 0) {
+            syslog(LOG_INFO, "---[%hd]after : %s AND %s", auth.id, strop(loc.op), strop((*i).op, buf));
             break;
         }
+        syslog(LOG_INFO, "---[%hd]after : %s AND %s", auth.id, strop(loc.op), strop((*i).op, buf));
     }
 }
 

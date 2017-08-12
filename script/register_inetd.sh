@@ -9,7 +9,7 @@ fi
 
 read -p "Please input a normal username: " INPUT_UNAME
 
-NORM_USER=$(cut -d: -f1 /etc/passwd | grep ${INPUT_UNAME} | head -1)
+NORM_USER=$(cut -d: -f1 /etc/passwd | grep "^${INPUT_UNAME}" | head -1)
 
 if [ -z "${NORM_USER}" ]; then
     echo No such user: ${INPUT_UNAME}
@@ -38,7 +38,7 @@ XINETD_FILE=/etc/xinetd.d/jupiter
 
 INETD=$(echo -e "jupiter\t\tstream\ttcp\tnowait\t${NORM_USER}\t$(realpath ${EXE})\t$(realpath ${EXE})")
 SERVICE=$(echo -e "jupiter\t\t$((78663&0xffff))/tcp\t\t\t# Jupiter service")
-XINETD=$(echo -e "service jupiter\n{\n\tdisable\t\t= no\n\tsocket_type\t= stream\n\tprotocol\t= tcp\n\tuser\t\t= ${NORM_USER}\n\twait\t\t= no\n\tserver\t\t= $(realpath $EXE)\n\tonly_from\t= 127.0.0.1\n}")
+XINETD=$(echo -e "service jupiter\n{\n\tdisable\t\t= no\n\tsocket_type\t= stream\n\tprotocol\t= tcp\n\tuser\t\t= ${NORM_USER}\n\twait\t\t= no\n\tserver\t\t= $(realpath $EXE)\n\tonly_from\t= 127.0.0.1 ::1\n\tflags\t\t= IPv6\n}")
 
 echo
 if grep jupiter $SERVICE_FILE &> /dev/null; then

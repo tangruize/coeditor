@@ -44,7 +44,7 @@ int xform(op_t &op, op_t &outop) {
         if (op.char_offset > outop.char_offset) {
             --op.char_offset;
         }
-        else if (op.char_offset < outop.char_offset) {
+        else /* if (op.char_offset <= outop.char_offset) */ {
             ++outop.char_offset;
         }
         

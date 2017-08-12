@@ -1,0 +1,42 @@
+Aug 11 21:31:08 TRZ jupiter-server: [3019]state: 0, I 0 a
+Aug 11 21:31:08 TRZ jupiter-server: [3019]state: 0, I 1 a
+Aug 11 21:31:08 TRZ jupiter-server: [3019]state: 0, I 2 a
+Aug 11 21:31:08 TRZ jupiter-server: [3019]state: 0, I 3 a
+Aug 11 21:31:16 TRZ jupiter-server: [3019]state: 0, D 3 a
+Aug 11 21:31:16 TRZ jupiter-server: [3019]state: 0, D 0 a
+Aug 11 21:31:16 TRZ jupiter-server: [3019]state: 0, I 1 a
+Aug 11 21:31:16 TRZ jupiter-server: [3019]state: 0, I 2 a
+Aug 11 21:31:17 TRZ jupiter-server: [3052]state: 4, D 2 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]before: D 2 a AND D 3 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]after : D 2 a AND D 2 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]before: D 2 a AND D 0 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]after : D 1 a AND D 0 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]before: D 1 a AND I 1 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]after : D 2 a AND I 1 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]before: D 2 a AND I 2 a
+Aug 11 21:31:17 TRZ jupiter-server: ---[3052]after : D 3 a AND I 2 a
+Aug 11 21:31:18 TRZ jupiter-server: [3052]state: 4, D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: D 1 a AND D 2 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : D 1 a AND D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: D 1 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : D 0 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: D 0 a AND I 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : D 0 a AND I 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: D 0 a AND I 2 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : D 0 a AND I 1 a
+Aug 11 21:31:18 TRZ jupiter-server: [3052]state: 4, I 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 1 a AND D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 1 a AND D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 1 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 0 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 0 a AND I 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : 0 0 a AND 0 0 a
+Aug 11 21:31:18 TRZ jupiter-server: [3052]state: 4, I 2 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 2 a AND D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 1 a AND D 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 1 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 0 a AND D 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 0 a AND 0 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 0 a AND 0 0 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]before: I 0 a AND I 1 a
+Aug 11 21:31:18 TRZ jupiter-server: ---[3052]after : I 0 a AND I 2 a
