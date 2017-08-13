@@ -7,6 +7,7 @@
  ************************************************************************/
 
 #include "text.h"
+//#define NDEBUG
 
 textOp::textOp(const string &filename) {
     if (filename.size()) {
@@ -115,7 +116,11 @@ void textOp::printLines(int start, int count, bool lineno) {
 
 /* locate at a given line */
 file_t::iterator textOp::locateLine(int no) {
-    if (no < 1 || no > getTotalLines()) {
+    //assert(cerr << "Locating " << no << endl);
+    if (no == cur_line_no) {
+        return cur_line_it;
+    }
+    if (no < 1 || no > edit_file.size()) {
         return edit_file.end();
     }
     int distance = no - cur_line_no;
@@ -126,15 +131,13 @@ file_t::iterator textOp::locateLine(int no) {
             --cur_line_it;
             cur_char -= cur_line_it->line.size() + 1;
             return cur_line_it;
-        case 0:
-            return cur_line_it;
         case 1:
             cur_char += cur_line_it->line.size() + 1;
             return ++cur_line_it;
         default:
             break;
     }
-    if (edit_file.size() - no < distance) {
+    if ((int)edit_file.size() - no < distance) {
         /* locate from end */
         distance = no - edit_file.size();
         cur_line_it = edit_file.end();
@@ -171,7 +174,7 @@ file_t::iterator textOp::locateLine(int no) {
 uint64_t textOp::translatePos(const pos_t pos) {
     assert(cerr << "tanslating postion (" << pos.lineno << ", " <<
            pos.offset << ") ... ");
-    file_t::iterator it = locateLine(pos.lineno);
+    file_t::iterator it = textOp::locateLine(pos.lineno);
     if (it == edit_file.end() || pos.offset < 0
         || pos.offset > it->line.size() + 1)
     {
@@ -191,10 +194,10 @@ pos_t textOp::translateOffset(uint64_t offset) {
         return result;
     }
     if ((int64_t)(offset - cur_char) > (int64_t)(total_chars - offset)) {
-        locateLine(edit_file.size());
+        textOp::locateLine(edit_file.size());
     }
     else if ((int64_t)(cur_char - offset) > (int64_t)offset) {
-        locateLine(1);
+        textOp::locateLine(1);
     }
     int64_t distance = (int64_t)(offset - cur_char);
     file_t::iterator it;
@@ -202,13 +205,13 @@ pos_t textOp::translateOffset(uint64_t offset) {
         for (; cur_line_no > 0 && distance < 0;
                 distance = (int64_t)(offset - cur_char))
         {
-            it = locateLine(cur_line_no - 1);
+            it = textOp::locateLine(cur_line_no - 1);
         }
     }
     else {
         int sz = edit_file.size(), locate_lineno = cur_line_no;
         do {
-            it = locateLine(locate_lineno++);
+            it = textOp::locateLine(locate_lineno++);
         } while (cur_char + it->line.size() < offset
                  && cur_line_no < sz);
     }
@@ -224,7 +227,7 @@ prompt_t textOp::deleteChar(pos_t pos, char *c) {
     assert(cerr << "Deleting (" << pos.lineno << ", " 
                 << pos.offset << ")\n");
     assert(cerr << "---Locating line " << pos.lineno << '\n');
-    file_t::iterator it = locateLine(pos.lineno);
+    file_t::iterator it = textOp::locateLine(pos.lineno);
     if (it == edit_file.end() || it->line.size() + 1 < pos.offset
         || pos.offset < 1
         || (pos.lineno == edit_file.size()
@@ -286,7 +289,7 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
     cerr << "' into (" << pos.lineno << ", " << pos.offset << ")\n";
     #endif
     assert(cerr << "---Locating line " << pos.lineno << '\n');
-    file_t::iterator it = locateLine(pos.lineno);
+    file_t::iterator it = textOp::locateLine(pos.lineno);
     if (it == edit_file.end() || it->line.size() + 1 < pos.offset
         || pos.offset < 1)
     {

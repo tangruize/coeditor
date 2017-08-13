@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:t:pwdol")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:T:pwdol")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
@@ -28,6 +28,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 't':
                 ot_time_arg = optarg;
+                break;
+            case 'T':
+                ot_recv_time_arg = optarg;
                 break;
             case 'o':
                 remove_fifo_ot = false;

@@ -29,6 +29,9 @@ public:
     /* insert a character at given file offset */
     virtual prompt_t insertCharAt(uint64_t off, char c,
                                   pos_t *p = NULL);
+
+    /* locate at a given line */
+    virtual file_t::iterator locateLine(int no);
 };
 
 #endif

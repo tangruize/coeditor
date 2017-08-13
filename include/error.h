@@ -14,9 +14,9 @@
 /* make assert() effective, comment it to disable */
 #define DEBUG
 #ifdef DEBUG
-#ifdef NDEBUG
-#undef NDEBUG
-#endif /* NDEBUG */
+//#ifdef NDEBUG
+//#undef NDEBUG
+//#endif /* NDEBUG */
 #else
 #define NDEBUG
 #endif /* DEBUG */
@@ -56,6 +56,14 @@ void _err(prompt_t &errmsg, bool term, int lineno, const char *file);
 
 #define PROMPT_ERROR_EN(msg) do { \
         int saved_errno = errno; \
+        std::string msg_en = string(msg) + string(": ") \
+                             + strerror(saved_errno); \
+        if (msg_en != NOERR) { \
+            errMsg(msg_en); \
+        } \
+    } while(0)
+
+#define PROMPT_ERROR_EN_S(msg, saved_errno) do { \
         std::string msg_en = string(msg) + string(": ") \
                              + strerror(saved_errno); \
         if (msg_en != NOERR) { \

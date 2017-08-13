@@ -33,7 +33,7 @@ struct op_t {
 
 /* enum some operations */
 enum {
-    NOOP = 0, SYN = 0,
+    NOOP = 0, SYN = 0, SEND_SYN = 1, RECV_SYN = 2,
     DELETE = 'd', INSERT = 'i', PRINT = 'p', SAVE = 's',
     CH_DELETE = 'D', CH_INSERT = 'I'
 };

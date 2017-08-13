@@ -35,7 +35,7 @@ public:
     prompt_t loadFile(const string &filename);
 
     /* locate at a given line */
-    file_t::iterator locateLine(int no);
+    virtual file_t::iterator locateLine(int no);
 
     /* print buf for debug */
     void printLines(int start = 1, int count = -1, bool lineno = true);

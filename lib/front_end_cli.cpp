@@ -63,7 +63,8 @@ void frontEndCli(textOp &file, istream &in) {
         }
         if (cmd.size() != 1 || ((data.size() > 2
             || (op.pos.lineno == -1 && offset == (uint64_t)-1))
-            && cmd[0] != SAVE && cmd[0] != PRINT && cmd[0] != 'l'))
+            && cmd[0] != SAVE && cmd[0] != PRINT && cmd[0] != 'l' 
+            && cmd[0] != 'u' && cmd[0] != 'r'))
         {
             errMsg("frontEndCli: syntax error: " + line);
             continue;
@@ -74,6 +75,17 @@ void frontEndCli(textOp &file, istream &in) {
         switch (op.operation) {
             case 'l':
                 memset(&saved_op, 0, sizeof(saved_op));
+                saved_op.operation = SYN;
+                writeOpFifo(saved_op);
+                break;
+            case 'u':
+                memset(&saved_op, 0, sizeof(saved_op));
+                saved_op.operation = SEND_SYN;
+                writeOpFifo(saved_op);
+                break;
+            case 'r':
+                memset(&saved_op, 0, sizeof(saved_op));
+                saved_op.operation = RECV_SYN;
                 writeOpFifo(saved_op);
                 break;
             case CH_DELETE:

@@ -110,12 +110,12 @@ static void *fifoInputCli_thread(void *arg) {
 
 void frontEnd_V2(textOp &file) {
     redirectStderr();
-#ifdef DEBUG
+//#ifdef DEBUG
     if (!no_cli && creatCliInputFifo() == 0) {
         pthread_t t1;
         pthread_create(&t1, NULL, fifoInputCli_thread, &file);
     }
-#endif
+//#endif
     frontEndCurses(file);
 }
 

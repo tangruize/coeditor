@@ -1712,8 +1712,9 @@ void getHelp() {
     drawStatusMsgImm(NULL);
 }
 
-void calPos() {
+bool calPos() {
     const op_t *op;
+    bool need_redraw = false;
     while ((op = queuedOp(0)) != NULL) {
         if (op->data == '\n' && op->pos.lineno < cur_pos.lineno) {
             if (op->operation == INSERT) {
@@ -1744,6 +1745,14 @@ void calPos() {
                 }
             }
         }
+        if (op->pos.lineno > screen_start_line + CONTENT_LINES) {
+            continue;
+        }
+        else if (op->data == '\n'
+                 || op->pos.lineno >= screen_start_line)
+        {
+            need_redraw = true;
+        }
     }
     while (cur_pos.lineno >= screen_start_line + CONTENT_LINES) {
         screen_start_line += HALF_HEIGHT;
@@ -1757,6 +1766,7 @@ void calPos() {
     if (screen_start_line < 1) {
         screen_start_line = 1;
     }
+    return need_redraw;
 }
 
 void showOTexited(int status) {
@@ -1839,13 +1849,14 @@ void control() {
     bool edit_mode = true;
     while (true) {
         setTitleModifiedFlag();
-        timeout(50);
+        timeout(100);
         ch = getch();
         timeout(-1);
         if (buf_changed) {
             buf_changed = 0;
-            calPos();
-            redraw();
+            if (calPos()) {
+                redraw();
+            }
         }
         if (ot_status != -1) {
             showOTexited(ot_status);
@@ -1942,8 +1953,15 @@ void control() {
                     keyEnd();
                     break;
                 case 'L': /* Refresh (redraw) the current screen */
-                    writeOpFifo(syn);
                     redraw(RD_ALL);
+                    break;
+                case 'U': /* Upload(synchronize) send operations */
+                    syn.operation = SEND_SYN;
+                    writeOpFifo(syn);
+                    break;
+                case 'K': /* Receive(synchronize) operations from server */
+                    syn.operation = RECV_SYN;
+                    writeOpFifo(syn);
                     break;
                 case 'Z': /* Suspend the editor */
                     suspendEditor();
@@ -1960,8 +1978,9 @@ void control() {
                 case 'C': /* Print Cur Pos */
                     printCurPos();
                     break;
-                case 'S': /* Search */
-                    whereIs();
+                case 'S': /* Synchronize all queued operations */
+                    syn.operation = SYN;
+                    writeOpFifo(syn);
                     break;
                 case 'G': /* Get help */
                     getHelp();

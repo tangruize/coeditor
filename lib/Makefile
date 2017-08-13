@@ -1,6 +1,6 @@
 include ../Makefile.inc
 
-LIBS = libfrontend.so.1 libinetsockets.so.1
+LIBS = libfrontend.so.1 libinetsockets.so.1 libxform.a
 
 SRC = $(wildcard *.cpp)
 
@@ -65,6 +65,9 @@ libinetsockets.so.1 : inet_sockets.o rdwrn.o
 	-ln -s libinetsockets.so.1.0.1 libinetsockets.so.1
 	-ln -s libinetsockets.so.1 libinetsockets.so
 	ar r libinetsockets.a $^
+
+libxform.a : xform.o
+	ar r libxform.a $^
 
 %.d: %.cpp
 	@set -e; rm -f $@; \

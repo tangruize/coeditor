@@ -36,6 +36,7 @@ extern string from_server_fifo_name;
 extern string server_addr;
 extern string lock_file;
 extern string ot_time_arg;
+extern string ot_recv_time_arg;
 extern bool remove_fifo_ot;
 extern bool no_debug;
 extern textOp *edit_file;

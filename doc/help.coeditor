@@ -16,6 +16,11 @@ Coeditor help text
 ^W            Write the current file to disk
 ^C            Display the position of the cursor
 
+^L            Refresh screen
+^U            Synchronize queued sending operations
+^K            Apply queued received operations
+^S            Synchronize all queued operations immediately
+
 ^T            Go to line and column number
 ^O            Go to file offset
 ^Y            Go to previous screen
@@ -26,12 +31,13 @@ Coeditor help text
 ^A            Go to beginning of current line
 ^E            Go to end of current line
 
-^L            Refresh screen and synchronize ops immediately
-^R            Troggle edit mode and view mode
+^F            Go forward one character
+^B            Go back on character
 ^D            Alternative Delete key
 ^H            Alternative Backspace key
 
 ^Z            Suspend the editor
+^R            Troggle edit mode and view mode
 
 
 Coeditor command line arguments
@@ -41,10 +47,11 @@ Coeditor command line arguments
  file existence and permissions.  If file does not exist, Coeditor will create
  it while saving. 
 
- Coeditor supports 7 options up to now:
+ Coeditor supports 8 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
 -t milliseconds          deliver to OT (delay time before sending)
+-T milliseconds          deliver to OT (delay time before receiving)
 -w                       CLI command also writes OP ouput pipe (default not)
 -p                       OP ouput using (row, col) instead of file offset
 -o                       Invoke OT program manually
@@ -85,7 +92,10 @@ i row col char           Insert charater at (row, col)
 
 p [lineno, [n]]          Print n lines from lineno
 s [filename]             Save to filename
-l                        Synchronize immediately
+
+u                        Upload local operations immediately
+r                        Receive server operations immediately
+l                        Synchronize all operations immediately
 
 
 Local I/O format

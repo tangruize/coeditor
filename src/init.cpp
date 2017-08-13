@@ -30,9 +30,27 @@
 #define DISABLE_EX_LOCK
 #define TRASH_FILE "/dev/null"
 
+string debug_output_file_name;
+string cli_input_fifo_name;
+string op_output_fifo_name;
+string op_input_fifo_name;
+string op_input_feedback_fifo_name;
+string to_server_fifo_name;
+string to_server_feedback_fifo_name;
+string from_server_fifo_name;
+string lock_file;
+string ot_time_arg;
+string ot_recv_time_arg;
+string server_addr;
 string out_file_prefix_no_pid = OUT_FILE_PREFIX;
 string out_file_prefix;
 textOp *edit_file;
+
+bool remove_fifo_ot = true;
+bool no_debug = true;
+
+/* feedback trash buf */
+static char pipe_buf[PIPE_BUF];
 
 string getCliInputFifoName() {
     return cli_input_fifo_name;
@@ -173,7 +191,12 @@ int openFifos(string &name, int &readfd, int &writefd) {
         return -1;
     }
     return 0;
+}
 
+void setBlock(int fd) {
+    int flags = fcntl(fd, F_GETFL);
+    flags &= ~O_NONBLOCK;
+    fcntl(fd, F_SETFL, flags);
 }
 
 int cli_read_fd = -1, cli_write_fd = -1;
@@ -198,6 +221,7 @@ int creatOpOutputFifo() {
         cerr << "OP output not started" << endl;
         return -1;
     }
+    setBlock(op_write_fd);
     return 0;
 }
 
@@ -225,9 +249,7 @@ int creatOpInputFifo() {
         cerr << "OP input not started" << endl;
         return -1;
     }
-    int flags = fcntl(op_in_read_fd, F_GETFL);
-    flags &= ~O_NONBLOCK;
-    fcntl(op_in_read_fd, F_SETFL, flags);
+    setBlock(op_in_read_fd);
     return 0;
 }
 
@@ -241,9 +263,7 @@ int creatServerInputFifo() {
         cerr << "Server input not started" << endl;
         return -1;
     }
-    int flags = fcntl(server_in_read_fd, F_GETFL);
-    flags &= ~O_NONBLOCK;
-    fcntl(server_in_read_fd, F_SETFL, flags);
+    setBlock(server_in_read_fd);
     return 0;
 }
 
@@ -257,6 +277,7 @@ int creatServerOuputFifo() {
         cerr << "Server output not started" << endl;
         return -1;
     }
+    setBlock(server_out_write_fd);
     return 0;
 }
 
@@ -276,50 +297,84 @@ int creatServerInputFeedbackFifo() {
 
 void reportWriteOpError(const op_t &op, int en) {
     cerr << "Output op failed: ";
-    if (en != 0) { 
-        cerr << strerror(en);
-    }
-    cerr << "\n---type: " << (char)op.operation << endl;
-    if (isupper(op.operation)) {
-        cerr << "---offset: " << op.char_offset << endl;
+    if (isalpha(op.operation)) {
+        cerr << (char)op.operation << " ";
     }
     else {
-        cerr << "---pos: (" << op.pos.lineno << ", "
-             << op.pos.offset << ")\n";
+        cerr << (unsigned)op.operation << " ";
     }
-    cerr << "---data: '";
+    if (islower(op.operation)) {
+        cerr << op.pos.lineno << " " << op.pos.offset << " ";
+    }
+    else {
+        cerr << op.char_offset << " ";
+    }
     if (isprint(op.data)) {
-        cerr << op.data << "'\n";
+        cerr << op.data;
     }
     else {
-        cerr << "0x" << hex << uppercase << (unsigned)op.data
-             << "'\n";
+        cerr << "0x" << hex << uppercase << (unsigned)op.data;
         cerr.unsetf(ios_base::hex);
+    }
+    if (en != 0) { 
+        cerr << ": " << strerror(en);
     }
 }
 
+static queue<op_t> local_ops;
+static pthread_t write_op_id;
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 void writeOpFifo(op_t &op) {
     if (op_write_fd == -1 || op_read_fd == -1) {
         return;
     }
     op.id = program_id;
-    static char pipe_buf[PIPE_BUF];
-    int try_times = 3;
-    while (try_times--
-           && write(op_write_fd, &op, sizeof(op_t)) != sizeof(op_t))
-    {
-        if (errno == EAGAIN) {
-            /* eat all unread buf */
-            read(op_read_fd, pipe_buf, PIPE_BUF);
+    int s = pthread_mutex_lock(&mtx);
+    if (s != 0) {
+        PROMPT_ERROR_EN_S("pthread_mutex_lock", s);
+    }
+    /* Let consumer know another unit is available */
+    local_ops.push(op);
+    s = pthread_mutex_unlock(&mtx);
+    if (s != 0) {
+        PROMPT_ERROR_EN_S("pthread_mutex_unlock", s);
+    }
+    /* Wake sleeping consumer */
+    s = pthread_cond_signal(&cond);
+    if (s != 0) {
+        PROMPT_ERROR_EN_S("pthread_cond_signal", s);
+    }
+}
+
+void *writeOp_Thread(void *args) {
+    pthread_detach(pthread_self());
+    while (true) {
+        int s = pthread_mutex_lock(&mtx);
+        if (s != 0) {
+            PROMPT_ERROR_EN_S("pthread_mutex_lock (consumer)", s);
         }
-        else {
-            reportWriteOpError(op, errno);
-            break;
+        /* Wait for something to consume */
+        while (local_ops.empty()) {
+            s = pthread_cond_wait(&cond, &mtx);
+            if (s != 0) {
+                PROMPT_ERROR_EN_S("pthread_cond_wait (consumer)", s);
+            }
+        }
+        s = pthread_mutex_unlock(&mtx);
+        if (s != 0) {
+            PROMPT_ERROR_EN_S("pthread_mutex_unlock (consumer)", s);
+        }
+        /* Consume all available units */
+        while (local_ops.size()) {
+            const op_t &op = local_ops.front();
+            if (write(op_write_fd, &op, sizeof(op_t)) == -1) {
+                reportWriteOpError(op, errno);
+            }
+            local_ops.pop();
         }
     }
-    if (try_times < 0) {
-        reportWriteOpError(op, 0);
-    }
+    return NULL;
 }
 
 int readOpInFifo(op_t &op) {
@@ -377,7 +432,6 @@ void *readOp_Thread(void *args) {
         }
         if (op_in_feedback_write_fd != -1) {
             int try_times = 3;
-            static char pipe_buf[PIPE_BUF];
             while (try_times-- &&
                    write(op_in_feedback_write_fd, &op, sizeof(op_t)) == -1
                    && errno == EAGAIN)
@@ -396,14 +450,10 @@ void *read_server_thread(void *args) {
     pthread_detach(pthread_self());
     trans_t t;
     ssize_t num_read;
-    static char pipe_buf[PIPE_BUF];
     while ((num_read = readn(socket_fd, &t, sizeof(trans_t))) > 0)
     {
-        int try_times = 3;
-        while (try_times-- && write(server_out_write_fd, &t,
-               num_read) == -1 && errno == EAGAIN)
-        {
-            read(server_out_read_fd, pipe_buf, PIPE_BUF);
+        if (write(server_out_write_fd, &t, num_read) == -1) {
+            PROMPT_ERROR_EN("write server output fifo");
         }
     }
     if (num_read == -1) {
@@ -416,7 +466,6 @@ void *write_server_thread(void *args) {
     pthread_detach(pthread_self());
     trans_t t;
     ssize_t num_read;
-    static char pipe_buf[PIPE_BUF];
     memset(&t, 0, sizeof(t));
     while ((num_read = read(server_in_read_fd, &t, sizeof(trans_t))) > 0) {
         if (writen(socket_fd, &t, sizeof(trans_t)) != sizeof(trans_t))
@@ -523,11 +572,7 @@ const op_t* queuedOp(int enqueue, op_t *op) {
     return NULL;
 }
 
-void sigHandler(int sig) {
-    exit(EXIT_SUCCESS);
-}
-
-void sigchldHandler(int sig) {
+void sigchldHandler() {
     int status;
     int pid = waitpid(-1, &status, WNOHANG);
     if (pid <= 0) {
@@ -546,20 +591,25 @@ void sigchldHandler(int sig) {
     }
 }
 
+void sigHandler(int sig) {
+    if (sig == SIGINT || sig == SIGTERM) {
+        exit(EXIT_SUCCESS);
+    }
+    else if (sig == SIGCHLD) {
+        sigchldHandler();
+    }
+}
+
 void initSignal() {
     struct sigaction sa;
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = sigHandler;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &sa, NULL) == -1
-        || sigaction(SIGTERM, &sa, NULL) == -1)
+        || sigaction(SIGTERM, &sa, NULL) == -1
+        || sigaction(SIGCHLD, &sa, NULL) == -1)
     {
         PROMPT_ERROR_EN("Error establishing signal handlers");
-        exit(EXIT_FAILURE);
-    }
-    sa.sa_handler = sigchldHandler;
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        PROMPT_ERROR_EN("Error establishing sigchld handler");
         exit(EXIT_FAILURE);
     }
 }
@@ -610,20 +660,20 @@ void initOt() {
     }
     extern char *program_invocation_name;
     chdir(dirname(program_invocation_name));
+    char argv0[] = "jupiter-ot";
+    char *ot_argv[6] = { argv0, NULL, NULL, NULL, NULL, NULL };
+    int i = 1;
     if (ot_time_arg.size()) {
-        if (execl("./jupiter-ot", "jupiter-ot", "-t", 
-                  ot_time_arg.c_str(), NULL) == -1)
-        {
-            PROMPT_ERROR_EN("execl");
-            _exit(EXIT_FAILURE);
-        }
+        ot_argv[i++] = strdup("-t");
+        ot_argv[i++] = strdup(ot_time_arg.c_str());
     }
-    else {
-        if (execl("./jupiter-ot", "jupiter-ot", NULL) == -1)
-        {
-            PROMPT_ERROR_EN("execl");
-            _exit(EXIT_FAILURE);
-        }
+    if (ot_recv_time_arg.size()) {
+        ot_argv[i++] = strdup("-T");
+        ot_argv[i] = strdup(ot_recv_time_arg.c_str());
+    }
+    if (execv("./jupiter-ot", ot_argv) == -1) {
+        PROMPT_ERROR_EN("execl");
+        _exit(EXIT_FAILURE);
     }
 }
 
@@ -641,7 +691,16 @@ void init() {
         pos_to_transform = new queue<op_t>;
     }
     if (!remove_fifo_ot || server_addr.size()) {
-        creatOpOutputFifo();
+        if (creatOpOutputFifo() == 0) {
+            int s = pthread_create(&write_op_id, NULL, writeOp_Thread, NULL);
+            if (s != 0) {
+                close(op_write_fd);
+                close(op_read_fd);
+                op_write_fd = op_read_fd = -1;
+                deleteOutFile(op_output_fifo_name);
+                cerr << "OP output not started" << endl;
+            }
+        }
         if (creatOpInputFifo() == 0) {
             creatOpInputFeedbackFifo();
             pthread_t read_op_id;
@@ -649,6 +708,7 @@ void init() {
             if (s != 0) {
                 close(op_in_read_fd);
                 close(op_in_write_fd);
+                op_in_read_fd = op_in_write_fd = -1;
                 deleteOutFile(op_input_fifo_name);
                 cerr << "OP input not started" << endl;
             }
@@ -656,7 +716,7 @@ void init() {
     }
     if (server_addr.size()) {
         socket_fd = inetConnect(server_addr.c_str(),
-                                "jupiter", SOCK_STREAM);
+                                "13127", SOCK_STREAM);
         if (socket_fd == -1) {
             PROMPT_ERROR_EN("Error connecting " + server_addr);
             exit(EXIT_FAILURE);

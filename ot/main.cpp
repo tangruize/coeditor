@@ -13,9 +13,13 @@
 #include <ctype.h>
 #include <signal.h>
 #include <queue>
+#include <sys/time.h>
 
 #include "common.h"
+#include "xform.h"
 #include "op.h"
+
+//#define DEBUG
 
 #define FROM_LOCAL_FILENO      0
 #define TO_LOCAL_FILENO        1
@@ -35,90 +39,11 @@ struct pollfd fds[] = {
 unsigned local, global;
 list<trans_t> outgoing;
 queue<trans_t> to_send;
+queue<trans_t> to_recv;
 int sleep_before_send = 0;
+int sleep_before_recv = 0;
 
-int xform(op_t &op, op_t &outop) {
-    if (op.operation == 0) {
-        return 1;
-    }
-    else if (outop.operation == 0) {
-        return 0;
-    }
-    if (op.operation == CH_DELETE && outop.operation == CH_DELETE) {
-        if (op.char_offset > outop.char_offset) {
-            --op.char_offset;
-        }
-        else if (op.char_offset < outop.char_offset) {
-            --outop.char_offset;
-        }
-        else /* if (op.char_offset == outop.char_offset) */ {
-            /* delete same char, do nothing */
-            op.operation = NOOP;
-            outop.operation = NOOP;
-            return 1;
-        }
-    }
-    else if (op.operation == CH_DELETE && outop.operation == CH_INSERT)
-    {
-        if (op.char_offset >= outop.char_offset) {
-            ++op.char_offset;
-        }
-        else /* if (op.char_offset < outop.char_offset) */ {
-            --outop.char_offset;
-        }
-    }
-    else if (op.operation == CH_INSERT && outop.operation == CH_DELETE)
-    {
-        if (op.char_offset > outop.char_offset) {
-            --op.char_offset;
-        }
-        else /* if (op.char_offset <= outop.char_offset) */ {
-            ++outop.char_offset;
-        }
-    }
-    else if (op.operation == CH_INSERT && outop.operation
-             == CH_INSERT)
-    {
-        if (op.char_offset > outop.char_offset) {
-            ++op.char_offset;
-        }
-        else if (op.char_offset < outop.char_offset) {
-            ++outop.char_offset;
-        }
-        else if (op.data != outop.data
-                 /* && op.char_offset == outop.char_offset */ )
-        {
-            /* Insert different chars at different offset */
-            if (op.id > outop.id) {
-                ++op.char_offset;
-            }
-            else if (op.id < outop.id) {
-                ++outop.char_offset;
-            }
-            else {
-                /* should never happen! */
-                cerr << "WARNING: IDs should not be same" << endl;
-            }
-        }
-        else /* if (op.data == outop.data
-                 && op.char_offset == outop.char_offset) */
-        {
-            /* insert same char, do nothing */
-            op.operation = NOOP;
-            outop.operation = NOOP;
-            return 1;
-        }
-    }
-    else {
-        /* unknown operations */
-        cerr << "WARNING: unsupported operations: " 
-             << (char)op.operation << ", " << (char)outop.operation
-             << endl;
-    }
-    return 0;
-}
-
-void printError(const op_t &op) {
+void printError(const op_t &op, bool newline = true) {
     if (isalpha(op.operation)) {
         cerr << (char)op.operation << " ";
     }
@@ -138,7 +63,9 @@ void printError(const op_t &op) {
         cerr << "0x" << hex << uppercase << (unsigned)op.data;
         cerr.unsetf(ios_base::hex);
     }
-//    cerr << endl;
+    if (newline) {
+        cerr << endl;
+    }
 }
 
 static bool error_check_disabled = false;
@@ -233,9 +160,10 @@ void Generate(const op_t &op) {
 }
 
 void Receive(trans_t &msg) {
+    #ifdef DEBUG
     cerr << "state: " << msg.state << ", ";
     printError(msg.op);
-    cerr << endl;
+    #endif
     /* Discard acknowledged messages. */
     for (list<trans_t>::iterator m = outgoing.begin();
          m != outgoing.end(); ++m)
@@ -255,25 +183,28 @@ void Receive(trans_t &msg) {
     for (list<trans_t>::iterator i = outgoing.begin();
          i != outgoing.end(); ++i)
     {
+        #ifdef DEBUG
         cerr << "---before ot: ";
-        printError(msg.op);
+        printError(msg.op, false);
         cerr << " AND ";
         printError((*i).op);
-        cerr << endl;
+        #endif
         /* Transform new message and the ones in the queue. */
-        if (xform(msg.op, (*i).op) != 0) {
+        if (xformClient(msg.op, (*i).op) != 0) {
+            #ifdef DEBUG
             cerr << "---after  ot: ";
-            printError(msg.op);
+            printError(msg.op, false);
             cerr << " AND ";
             printError((*i).op);
-            cerr << endl;
+            #endif
             break;
         }
+        #ifdef DEBUG
         cerr << "---after  ot: ";
-        printError(msg.op);
+        printError(msg.op, false);
         cerr << " AND ";
         printError((*i).op);
-        cerr << endl;
+        #endif
     }
     if (msg.op.operation != NOOP) {
         if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {
@@ -286,6 +217,17 @@ void Receive(trans_t &msg) {
     ++global;
 }
 
+/* delay before receive if delay time is set */
+void delayReceive(trans_t &msg) {
+    if (sleep_before_recv) {
+        to_recv.push(msg);
+    }
+    else {
+        Receive(msg);
+    }
+}
+
+/* error check may receive no data, prevent from blocking */
 int setNonblock(int fd) {
     int flags = fcntl(fd, F_GETFL);
     if (flags == -1) {
@@ -296,6 +238,7 @@ int setNonblock(int fd) {
     return 0;
 }
 
+/* if feedback fds not opened, error check is disabled */
 void initErrorCheck() {
     int errfds[] = {LOCAL_FEEDBACK_FILENO, SERVER_FEEDBACK_FILENO};
     for (int i = 0; i < SIZEOFARRAY(errfds); ++i) {
@@ -307,7 +250,8 @@ void initErrorCheck() {
     }
 }
 
-void synchronize() {
+/* upload local operations to server immediately */
+void synSend() {
     while (to_send.size()) {
         const trans_t &t = to_send.front();
         writeServer(t);
@@ -315,14 +259,85 @@ void synchronize() {
     }
 }
 
+/* apply server operations to local immediately */
+void synReceive() {
+    while (to_recv.size()) {
+        const trans_t &t = to_recv.front();
+        trans_t msg = t;
+        Receive(msg);
+        to_recv.pop();
+    }
+}
+
+void synchronize() {
+    synSend();
+    synReceive();
+}
+
+/* timer for receive event */
+void initTimer() {
+    if (sleep_before_recv <= 0) {
+        return;
+    }
+    struct timeval tv;
+    sleep_before_recv *= 1000;
+    tv.tv_sec = sleep_before_recv / 1000000;
+    tv.tv_usec = sleep_before_recv % 1000000;
+    struct itimerval itv;
+    itv.it_interval = itv.it_value = tv;
+    if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+        cerr << "ERROR: setitimer: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+void sigHandler(int sig) {
+    if (sig == SIGINT || sig == SIGTERM) {
+        /* synchronize all and then exit, so that data won't lose */
+        synchronize();
+        exit(EXIT_SUCCESS);
+    }
+    if (sig == SIGALRM) {
+        synReceive();
+    }
+}
+
+void initSignal() {
+    struct sigaction sa;
+    sa.sa_flags = SA_RESTART;
+    sa.sa_handler = sigHandler;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGINT, &sa, NULL) == -1
+        || sigaction(SIGTERM, &sa, NULL) == -1
+        || sigaction(SIGALRM, &sa, NULL) == -1)
+    {
+        cerr << "ERROR: sigaction: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    }
+    /* Ignore the SIGPIPE signal, so that we find out about
+     * broken connection errors via a failure from write(). 
+     */
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+        cerr << "ERROR: signal: " << strerror(errno) << endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "t:")) != -1) {
+    while ((opt = getopt(argc, argv, "t:T:")) != -1) {
         switch (opt) {
             case 't':
                 sleep_before_send = atoi(optarg);
                 if (sleep_before_send == 0 && optarg[0] != '0') {
-                    cerr << "WARNING: Invalid sleep time: "
+                    cerr << "WARNING: Invalid send delay time: "
+                         << optarg << endl;
+                }
+                break;
+            case 'T':
+                sleep_before_recv = atoi(optarg);
+                if (sleep_before_recv == 0 && optarg[0] != '0') {
+                    cerr << "WARNING: Invalid receive delay time: "
                          << optarg << endl;
                 }
                 break;
@@ -331,14 +346,9 @@ int main(int argc, char *argv[]) {
         }
     }
     initErrorCheck();
+    initSignal();
+    initTimer();
     trans_t msg;
-    /* Ignore the SIGPIPE signal, so that we find out about
-     * broken connection errors via a failure from write(). 
-     */
-    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
-        cerr << "ERROR: signal: " << strerror(errno) << endl;
-        exit(EXIT_FAILURE);
-    }
     int poll_ret, timeout;
     if (sleep_before_send <= 0) {
         timeout = -1;
@@ -349,8 +359,8 @@ int main(int argc, char *argv[]) {
     while ((poll_ret = poll(fds, SIZEOFARRAY(fds), timeout)) != -1
            || errno == EINTR) {
         if (poll_ret == 0) {
-            /* timeout */
-            synchronize();
+            /* timeout if no local input, upload */
+            synSend();
             continue;
         }
         int hup = 0;
@@ -364,6 +374,12 @@ int main(int argc, char *argv[]) {
                             /* user synchronism signal */
                             synchronize();
                         }
+                        else if (msg.op.operation == SEND_SYN) {
+                            synSend();
+                        }
+                        else if (msg.op.operation == RECV_SYN) {
+                            synReceive();
+                        }
                         else {
                             Generate(msg.op);
                         }
@@ -373,7 +389,7 @@ int main(int argc, char *argv[]) {
                     if (read(fds[i].fd, &msg, sizeof(trans_t))
                         == sizeof(trans_t))
                     {
-                        Receive(msg);
+                        delayReceive(msg);
                     }
                 }
             }
@@ -391,5 +407,6 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
+    synchronize();
     return 0;
 }

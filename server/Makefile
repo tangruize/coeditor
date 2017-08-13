@@ -6,7 +6,7 @@ EXE = ../jupiter-server
 
 LIB_DIR = ../lib
 
-LIBS = ${LIB_DIR}/libinetsockets.a
+LIBS = ${LIB_DIR}/libinetsockets.a ${LIB_DIR}/libxform.a
 
 all : ${EXE}
 
