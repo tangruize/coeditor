@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:t:T:pwdol")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:T:pwdolfF")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
@@ -40,6 +40,12 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 no_cli = 0;
+                break;
+            case 'f':
+                lo_feedback = 0;
+                break;
+            case 'F':
+                re_feedback = 0;
                 break;
             default:
                 cerr << "Invalid arguments" << endl;

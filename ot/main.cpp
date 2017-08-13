@@ -68,11 +68,9 @@ void printError(const op_t &op, bool newline = true) {
     }
 }
 
-static bool error_check_disabled = false;
+enum {LO_CHECK = 1, RE_CHECK = 2};
+static int error_check = LO_CHECK | RE_CHECK;
 void errorCheck(int fd, const op_t &orig_op) {
-    if (error_check_disabled) {
-        return;
-    }
     trans_t msg;
     ssize_t num_read = read(fd, &msg, sizeof(msg));
     if (num_read == sizeof(msg)) {
@@ -117,14 +115,8 @@ void errorCheck(int fd, const op_t &orig_op) {
         }
     }
     else if (num_read == -1) {
-        if (errno == EAGAIN) {
-            cerr << "WARNING: no error check data received (fd: "
-                 << fd << ")" << endl;
-        }
-        else {
-            cerr << "Error: checking error: " << strerror(errno)
-                 << " (fd: " << fd << ")" << endl;
-        }
+        cerr << "Error: checking error: " << strerror(errno)
+             << " (fd: " << fd << ")" << endl;
     }
     else {
         /* should not happen */
@@ -135,7 +127,9 @@ void errorCheck(int fd, const op_t &orig_op) {
 
 void writeServer(const trans_t &msg) {
     if (write(TO_SERVER_FILENO, &msg, sizeof(msg)) != -1) {
-        errorCheck(SERVER_FEEDBACK_FILENO, msg.op);
+        if (error_check & RE_CHECK) {
+            errorCheck(SERVER_FEEDBACK_FILENO, msg.op);
+        }
     }
     else {
         cerr << "ERROR: writing server: " << strerror(errno) << endl;
@@ -208,7 +202,9 @@ void Receive(trans_t &msg) {
     }
     if (msg.op.operation != NOOP) {
         if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {
-            errorCheck(LOCAL_FEEDBACK_FILENO, msg.op);
+            if (error_check & LO_CHECK) {
+                errorCheck(LOCAL_FEEDBACK_FILENO, msg.op);
+            }
         }
         else {
             cerr << "ERROR: writing local: " << strerror(errno) << endl;
@@ -228,25 +224,30 @@ void delayReceive(trans_t &msg) {
 }
 
 /* error check may receive no data, prevent from blocking */
+/* PS: bad idea, error check may receive partial data */
+/*
 int setNonblock(int fd) {
     int flags = fcntl(fd, F_GETFL);
     if (flags == -1) {
         return -1;
     }
-    flags &= ~O_NONBLOCK;
+    flags |= O_NONBLOCK;
     fcntl(fd, F_SETFL, flags);
     return 0;
 }
+*/
 
-/* if feedback fds not opened, error check is disabled */
+/* if feedback fds is not open or is not ok, error check is disabled */
 void initErrorCheck() {
-    int errfds[] = {LOCAL_FEEDBACK_FILENO, SERVER_FEEDBACK_FILENO};
-    for (int i = 0; i < SIZEOFARRAY(errfds); ++i) {
-        if (setNonblock(errfds[i]) != 0) {
-            error_check_disabled = true;
-            cerr << "WARNING: error check disabled" << endl;
-            return;
-        }
+    int i;
+    if (read(LOCAL_FEEDBACK_FILENO, &i, sizeof(i)) == -1 || i == 0) {
+        error_check &= ~LO_CHECK;
+    }
+    if (read(SERVER_FEEDBACK_FILENO, &i, sizeof(i)) == -1 || i == 0) {
+        error_check &= ~RE_CHECK;
+    }
+    if (!(error_check & LO_CHECK)) {
+        cerr << "WARNING: error check disabled for local op" << endl;
     }
 }
 
@@ -325,7 +326,7 @@ void initSignal() {
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "t:T:")) != -1) {
+    while ((opt = getopt(argc, argv, "t:T:fF")) != -1) {
         switch (opt) {
             case 't':
                 sleep_before_send = atoi(optarg);
@@ -340,6 +341,12 @@ int main(int argc, char *argv[]) {
                     cerr << "WARNING: Invalid receive delay time: "
                          << optarg << endl;
                 }
+                break;
+            case 'f':
+                error_check &= ~LO_CHECK;
+                break;
+            case 'F':
+                error_check &= ~RE_CHECK;
                 break;
             default:
                 break;

@@ -49,6 +49,9 @@ textOp *edit_file;
 bool remove_fifo_ot = true;
 bool no_debug = true;
 
+int lo_feedback = 3;
+int re_feedback = 3;
+
 /* feedback trash buf */
 static char pipe_buf[PIPE_BUF];
 
@@ -236,6 +239,7 @@ int creatOpInputFeedbackFifo() {
         cerr << "OP input feedback not started" << endl;
         return -1;
     }
+    write(op_in_feedback_write_fd, &lo_feedback, sizeof(lo_feedback));
     return 0;
 }
 
@@ -292,6 +296,7 @@ int creatServerInputFeedbackFifo() {
         cerr << "Server input feedback not started" << endl;
         return -1;
     }
+    write(server_in_feedback_write_fd, &re_feedback, sizeof(re_feedback));
     return 0;
 }
 
@@ -349,6 +354,9 @@ void writeOpFifo(op_t &op) {
 
 void *writeOp_Thread(void *args) {
     pthread_detach(pthread_self());
+    if (op_write_fd == -1) {
+        return NULL;
+    }
     while (true) {
         int s = pthread_mutex_lock(&mtx);
         if (s != 0) {
@@ -377,23 +385,15 @@ void *writeOp_Thread(void *args) {
     return NULL;
 }
 
-int readOpInFifo(op_t &op) {
-    if (op_in_read_fd == -1) {
-        return 0;
-    }
-    return (int)read(op_in_read_fd, &op, sizeof(op_t));
-}
-
 void *readOp_Thread(void *args) {
     pthread_detach(pthread_self());
+    if (op_in_read_fd == -1) {
+        return NULL;
+    }
     op_t op, q_op;
     int ret;
     string op_result;
-    while ((ret = readOpInFifo(op)) != 0) {
-        if (ret == -1) {
-            PROMPT_ERROR_EN("read op input fifo");
-            break;
-        }
+    while ((ret = readn(op_in_read_fd, &op, sizeof(op_t))) > 0) {
         q_op = op;
         switch (op.operation) {
             case DELETE:
@@ -413,6 +413,8 @@ void *readOp_Thread(void *args) {
                 q_op.operation = INSERT;
                 break;
             case NOOP:
+            case SEND_SYN:
+            case RECV_SYN:
                 break;
             default:
                 op_result = "FAILED";
@@ -430,15 +432,16 @@ void *readOp_Thread(void *args) {
             pos_to_transform->push(q_op);
             buf_changed = 1;
         }
-        if (op_in_feedback_write_fd != -1) {
-            int try_times = 3;
-            while (try_times-- &&
-                   write(op_in_feedback_write_fd, &op, sizeof(op_t)) == -1
-                   && errno == EAGAIN)
-            {
-                read(op_in_feedback_read_fd, pipe_buf, PIPE_BUF);
-            }
+        int try_times = lo_feedback;
+        while (try_times-- &&
+               write(op_in_feedback_write_fd, &op, sizeof(op_t)) == -1
+               && errno == EAGAIN)
+        {
+            read(op_in_feedback_read_fd, pipe_buf, PIPE_BUF);
         }
+    }
+    if (ret == -1) {
+        PROMPT_ERROR_EN("read op input fifo");
     }
     close(op_in_read_fd);
     return NULL;
@@ -446,7 +449,7 @@ void *readOp_Thread(void *args) {
 
 int socket_fd = -1;
 
-void *read_server_thread(void *args) {
+void *readServer_Thread(void *args) {
     pthread_detach(pthread_self());
     trans_t t;
     ssize_t num_read;
@@ -462,14 +465,15 @@ void *read_server_thread(void *args) {
     return NULL;
 }
 
-void *write_server_thread(void *args) {
+void *writeServer_Thread(void *args) {
     pthread_detach(pthread_self());
+    if (server_in_read_fd == -1) {
+        return NULL;
+    }
     trans_t t;
     ssize_t num_read;
-    memset(&t, 0, sizeof(t));
     while ((num_read = read(server_in_read_fd, &t, sizeof(trans_t))) > 0) {
-        if (writen(socket_fd, &t, sizeof(trans_t)) != sizeof(trans_t))
-        {
+        if (write(socket_fd, &t, num_read) != num_read) {
             /* failed */
             if (t.op.operation > 0) {
                 t.op.operation = -t.op.operation;
@@ -478,15 +482,18 @@ void *write_server_thread(void *args) {
                 t.op.operation = CHAR_MIN;
             }
         }
-        int try_times = 3;
+        int try_times = re_feedback;
         while (try_times-- &&
-               write(server_in_feedback_write_fd, &t, sizeof(t)) == -1
+               write(server_in_feedback_write_fd, &t, num_read) == -1
                && errno == EAGAIN)
         {
             read(server_in_feedback_read_fd, pipe_buf, PIPE_BUF);
         }
-        memset(&t, 0, sizeof(t));
     }
+    if (num_read == -1) {
+        PROMPT_ERROR_EN("read to server fifo");
+    }
+    close(server_in_read_fd);
     return NULL;
 }
 
@@ -652,6 +659,7 @@ void initOt() {
             PROMPT_ERROR_EN("fcntl");
             _exit(EXIT_FAILURE);
         }
+        /* set block */
         flags &= ~O_NONBLOCK;
         fcntl(i, F_SETFL);
     }
@@ -764,7 +772,7 @@ void init() {
         }
         else {
             pthread_t read_server_id, write_server_id;
-            int s = pthread_create(&read_server_id, NULL, read_server_thread,
+            int s = pthread_create(&read_server_id, NULL, readServer_Thread,
                                    NULL);
             if (s != 0) {
                 close(server_out_read_fd);
@@ -773,7 +781,7 @@ void init() {
                 deleteOutFile(from_server_fifo_name);
                 cerr << "Server output not started" << endl;
             }
-            s = pthread_create(&write_server_id, NULL, write_server_thread,
+            s = pthread_create(&write_server_id, NULL, writeServer_Thread,
                                NULL);
             if (s != 0) {
                 close(server_in_read_fd);

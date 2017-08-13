@@ -40,6 +40,8 @@ extern string ot_recv_time_arg;
 extern bool remove_fifo_ot;
 extern bool no_debug;
 extern textOp *edit_file;
+extern int lo_feedback;
+extern int re_feedback;
 
 void removeOutFileAtExit();
 void setOutFilenames();

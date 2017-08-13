@@ -39,8 +39,14 @@ rm -f ${PREFIX}*
 gnome-terminal --title='SERVER' -e "$EXE -od SERVER"
 
 # wait for creating relating file
-sleep 0.1
+TRY_TIMES=30
+while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}*.local.op.input &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
+while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}*.debug &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
 clear
+if [ $TRY_TIMES -eq 0 ]; then
+    echo timeout: pipe files not detected for server
+    exit 1
+fi
 
 # Set file names
 LOCAL_OP_IN=$(ls ${PREFIX}*.local.op.input)
@@ -48,11 +54,11 @@ DEBUG_FILE=$(ls ${PREFIX}*.debug)
 EXE_PID=${DEBUG_FILE#${PREFIX}}
 EXE_PID=${EXE_PID%.debug}
 
-tail --pid=$EXE_PID -c +197 -f $1 > ${LOCAL_OP_IN} &
+tail --pid=$EXE_PID -c +197 -f $1 | dd of="${LOCAL_OP_IN}" bs=12 &> /dev/null &
 tail --pid=$EXE_PID -f ${DEBUG_FILE} &
 
 sleep 1
 rm -f ${PREFIX}${EXE_PID}*
 
-trap "kill -INT $EXE_PID" 2 15
+trap "trap '' 2 15;kill -INT $EXE_PID" 2 15
 wait

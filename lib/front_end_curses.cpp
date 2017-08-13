@@ -571,6 +571,7 @@ int drawStatusMsgOneChar(status_t &msgs) {
             ch += 64;
         }
         else if (ch == KEY_RESIZE) {
+            drawStatusMsgImm(NULL);
             ch = 0;
         }
         if (strchr(msgs[1], ch) != NULL) {
@@ -618,6 +619,7 @@ int drawStatusMsgInput(int ch, int x, string *s = NULL) {
         }
     }
     else if (ch == KEY_RESIZE) {
+        drawStatusMsgImm(NULL);
         /* Cancel while resizing */
         if (s) {
             *s = "";
@@ -1690,6 +1692,7 @@ void getHelp() {
         }
         else if (ch == KEY_RESIZE) {
             redraw(RD_ALL);
+            drawStatusMsgImm(NULL);
         }
         else if (ch == KEY_UP) {
             preLine();
@@ -1712,9 +1715,10 @@ void getHelp() {
     drawStatusMsgImm(NULL);
 }
 
-bool calPos() {
+enum { NEED_REDRAW = 01, NEED_REDRAW_LINE = 02 };
+int calPos() {
     const op_t *op;
-    bool need_redraw = false;
+    int need_redraw = 0;
     while ((op = queuedOp(0)) != NULL) {
         if (op->data == '\n' && op->pos.lineno < cur_pos.lineno) {
             if (op->operation == INSERT) {
@@ -1748,10 +1752,16 @@ bool calPos() {
         if (op->pos.lineno > screen_start_line + CONTENT_LINES) {
             continue;
         }
-        else if (op->data == '\n'
-                 || op->pos.lineno >= screen_start_line)
-        {
-            need_redraw = true;
+        else if (op->data == '\n') {
+            need_redraw = NEED_REDRAW;
+        }
+        else if (op->pos.lineno >= screen_start_line) {
+            if (op->pos.lineno == cur_pos.lineno) {
+                need_redraw |= NEED_REDRAW_LINE;
+            }
+            else {
+                need_redraw = NEED_REDRAW;
+            }
         }
     }
     while (cur_pos.lineno >= screen_start_line + CONTENT_LINES) {
@@ -1849,13 +1859,17 @@ void control() {
     bool edit_mode = true;
     while (true) {
         setTitleModifiedFlag();
-        timeout(100);
+        timeout(150);
         ch = getch();
         timeout(-1);
         if (buf_changed) {
             buf_changed = 0;
-            if (calPos()) {
+            int ret = calPos();
+            if (ret & NEED_REDRAW) {
                 redraw();
+            }
+            else if (ret & NEED_REDRAW_LINE) {
+                redrawCurLine();
             }
         }
         if (ot_status != -1) {
@@ -1893,6 +1907,7 @@ void control() {
                 break;
             case KEY_RESIZE:
                 redraw(RD_ALL);
+                drawStatusMsgImm(NULL);
                 break;
             case KEY_BACKSPACE:
                 if (edit_mode) {
