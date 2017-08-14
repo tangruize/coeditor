@@ -10,7 +10,6 @@
 #include "rdwrn.h"
 #include "common.h"
 #include "xform.h"
-#include <set>
 #include <syslog.h>
 #include <unistd.h>
 #include <limits.h>
@@ -60,11 +59,6 @@ void login() {
                 /* file exists, race condition */
                 if (retry_times) {
                     --retry_times;
-                    struct timespec ts;
-                    ts.tv_sec = 0;
-                    ts.tv_nsec = 1000;
-                    /* sleep a while */
-                    nanosleep(&ts, NULL);
                     login();
                     return;
                 }
@@ -94,6 +88,7 @@ void login() {
     getFileLock();
     int n = 0;
     if (read(readfd, &n, sizeof(n)) == 0 || n == 0) {
+        /* race condition: file created but may not truncated */
         if (ftruncate(readfd, 0) == -1) {
             exit(EXIT_FAILURE);
         }
@@ -102,6 +97,7 @@ void login() {
         }
     }
     if (n == USER_MAX) {
+        /* reached user limit */
         exit(EXIT_FAILURE);
     }
     file_id_t fi, tmp;
@@ -117,6 +113,7 @@ void login() {
             exit(EXIT_FAILURE);
         }
         if (tmp.server_id == 0) {
+            /* get the seat */
             break;
         }
     }
@@ -130,13 +127,15 @@ void login() {
         }   
     }
     if (i == USER_MAX) {
-        /* should not happen */
+        /* no seat available, should not happen */
         exit(EXIT_FAILURE);
     }
+    /* take the seat */
     pwrite(readfd, &fi, sizeof(fi), sizeof(n) + sizeof(fi) * i);
     ++n;
     pwrite(readfd, &n, sizeof(n), 0);
     releaseFileLock();
+    /* op start offset */
     lseek(readfd, SHM_OFFSET, SEEK_SET);
 }
 
@@ -157,10 +156,12 @@ void logout() {
             _exit(EXIT_FAILURE);
         }
         if (tmp.server_id == prog_id) {
+            /* I am here */
             break;
         }
     }
     if (i == USER_MAX) {
+        /* where am I? */
         _exit(EXIT_FAILURE);
     }
     /* clear the seat */
@@ -291,7 +292,7 @@ void transform(trans_t &loc) {
 
 int main(int argc, char *argv[]) {
     trans_t data;
-    char auth_ok = 0;
+    char auth_ok = 1;
     ssize_t num_read;
     prog_id = getpid();
     memset(&data, 0, sizeof(trans_t));
@@ -311,12 +312,12 @@ int main(int argc, char *argv[]) {
         login();
         atexit(logout);
         /* ack */
-        if (writen(STDOUT_FILENO, &auth_ok, sizeof(auth_ok))
+        if (write(STDOUT_FILENO, &auth_ok, sizeof(auth_ok))
             != sizeof(auth_ok)) {
             exit(EXIT_FAILURE);
         }
     }
-    /* newcomer can get history operations immediately */
+    /* newcomer can get all history operations immediately */
     writeClient(SIGHUP);
     /* set sighup handler */
     sigset_t block_set, prev_mask;

@@ -1526,23 +1526,36 @@ void gotoOff() {
 #define MOUSE_SCROLL_DOWN 01000000000
 
 /* mouse key, dont support scroll keys (due to ncurses 5 mouse mask) */
-void keyMouse() {
+void keyMouse(bool help_state = false) {
     MEVENT mouse_event;
     if (getmouse(&mouse_event) == OK) {
         #if NCURSES_MOUSE_VERSION > 1
         if (mouse_event.bstate & MOUSE_SCROLL_UP) {
             for (int i = 0; i < 3; ++i) {
-                keyUp();
+                if (help_state) {
+                    preLine();
+                }
+                else {
+                    keyUp();
+                }
             }
             return;
         }
         else if (mouse_event.bstate & MOUSE_SCROLL_DOWN) {
             for (int i = 0; i < 3; ++i) {
-                keyDown();
+                if (help_state) {
+                    nextLine();
+                }
+                else {
+                    keyDown();
+                }
             }
             return;
         }
         #endif
+        if (help_state) {
+            return;
+        }
         if (mouse_event.y >= TITLE_LINES
             && mouse_event.y < LINES - STATUS_LINES)
         {
@@ -1705,6 +1718,9 @@ void getHelp() {
         }
         else if (ch == KEY_NPAGE) {
             nextPage();
+        }
+        else if (ch == KEY_MOUSE) {
+            keyMouse(true);
         }
     }
     editing_file = saved_edit_file;

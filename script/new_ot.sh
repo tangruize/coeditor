@@ -90,12 +90,12 @@ for i in ${EDIT_NAME[@]}; do
     EXE_PID=${DEBUG_FILE#$PREFIX.${i}.}
     EXE_PID=${EXE_PID%.debug}
     PIDS[$((k-1))]=$EXE_PID
+    echo -e "\033[$((k+30))mclient $k: $EXE_PID\033[0m"
     ${EXE_DIR}/jupiter-ot 0< ${LOCAL_OP} 1>| ${LOCAL_OP_IN} 3< ${SERVER_OP} 4>| ${SERVER_OP_IN} 5< ${LOCAL_OP_IN_F} 6< ${SERVER_OP_IN_F} 2> ${EDIT_DIR}/.ot.${i} $SLEEP_TIME $RECV_TIME &
 #    rm -f ${LOCAL_OP} ${LOCAL_OP_IN} ${LOCAL_OP_IN_F} ${SERVER_OP} ${SERVER_OP_IN} ${SERVER_OP_IN_F}
     while [ $TRY_TIMES -ne 0 ] && ! eval ls ${EDIT_DIR}/.ot.${i} &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
     tail --pid=${EXE_PID} -f ${EDIT_DIR}/.ot.${i} | sed -e "s/^/\x1b[$((k+30))m/" -e 's/$/\x1b[0m/' && kill -- -$$ &
     gnome-terminal --title="debug $k" -e "tail --pid=$EXE_PID -f $DEBUG_FILE "
-    echo -e "\033[$((k+30))mclient $k: $EXE_PID (wait time <= $(((30-TRY_TIMES)*100))ms)\033[0m"
     k=$((k+1))
 done
 

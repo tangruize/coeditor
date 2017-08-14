@@ -50,8 +50,8 @@ Coeditor command line arguments
  Coeditor supports 10 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
--t milliseconds          deliver to OT (delay time before sending)
--T milliseconds          deliver to OT (delay time before receiving)
+-t sec(float)            deliver to OT (delay time before sending)
+-T sec(float)            deliver to OT (delay time before receiving)
 -w                       CLI command also writes OP ouput pipe (default not)
 -p                       OP ouput using (row, col) (default file offset)
 -o                       Invoke OT program manually (default automatically)
@@ -138,8 +138,8 @@ File Desc    I/O    Intention
 
  Command line arguments:
 
--t milliseconds     Delay before sending (0 no delay, <0 no send, >0 time)
--T milliseconds     Delay before receiving (same as -t)
+-t sec(float)       Delay before sending (0 no delay, <0 no send, >0 time)
+-T sec(float)       Delay before receiving (same as -t)
 -f                  Not to check local op feedback
 -F                  Not to check server transmission feedback
 

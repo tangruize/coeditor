@@ -11,7 +11,7 @@ LIBS = ${LIB_DIR}/libxform.a
 all : ${EXE}
 
 ${EXE} : $(SRC:.cpp=.o)
-	${CXX} ${CXXFLAGS} -o $@ $^ ${LIBS}
+	${CXX} ${CXXFLAGS} -o $@ $^ ${LIBS} -lrt
 
 %.d: %.cpp
 	@set -e; rm -f $@; \
