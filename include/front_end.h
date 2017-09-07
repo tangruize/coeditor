@@ -9,7 +9,7 @@
 #ifndef _FRONT_END_H
 #define _FRONT_END_H
 
-#include "text.h"
+#include "text_mutex.h"
 
 extern "C" void frontEnd(textOp &file);
 extern "C" const char *front_end_version;

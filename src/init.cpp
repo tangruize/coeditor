@@ -391,30 +391,44 @@ void *readOp_Thread(void *args) {
         return NULL;
     }
     op_t op, q_op;
-    int ret;
+    int ret, flags = TM_NOLOCK;
     string op_result;
     while ((ret = readn(op_in_read_fd, &op, sizeof(op_t))) > 0) {
         q_op = op;
+        int try_times = lo_feedback;
+        op_result.clear();
         switch (op.operation) {
             case DELETE:
-                op_result = edit_file->deleteChar(op.pos, &op.data);
+                op_result = edit_file->deleteChar(op.pos,
+                                       &op.data, NULL, &flags);
                 break;
             case CH_DELETE:
                 op_result = edit_file->deleteCharAt(op.char_offset, 
-                                               &op.data, &q_op.pos);
+                                       &op.data, &q_op.pos, &flags);
                 q_op.operation = DELETE;
                 break;
             case INSERT:
-                op_result = edit_file->insertChar(op.pos, op.data);
+                op_result = edit_file->insertChar(op.pos,
+                                       op.data, NULL, &flags);
                 break;
             case CH_INSERT:
                 op_result = edit_file->insertCharAt(op.char_offset,
-                                               op.data, &q_op.pos);
+                                       op.data, &q_op.pos, &flags);
                 q_op.operation = INSERT;
                 break;
-            case NOOP:
-            case SEND_SYN:
             case RECV_SYN:
+                edit_file->lock();
+                memset(&q_op, 0, sizeof(op_t));
+                q_op.operation = NOOP;
+                writeOpFifo(q_op);
+                try_times = 0;
+                break;
+            case NOOP:
+                edit_file->unlock();
+                try_times = 0;
+                break;
+            case SEND_SYN:
+                try_times = 0;
                 break;
             default:
                 op_result = "FAILED";
@@ -428,11 +442,14 @@ void *readOp_Thread(void *args) {
             }
             PROMPT_ERROR(op_result);
         }
-        else if (front_end_number_version > 1 && q_op.operation != NOOP) {
+        else if (front_end_number_version > 1
+                && q_op.operation != NOOP
+                && q_op.operation != RECV_SYN
+                && q_op.operation != SEND_SYN)
+        {
             pos_to_transform->push(q_op);
             buf_changed = 1;
         }
-        int try_times = lo_feedback;
         while (try_times-- &&
                write(op_in_feedback_write_fd, &op, sizeof(op_t)) == -1
                && errno == EAGAIN)
@@ -721,6 +738,9 @@ void init() {
                 cerr << "OP input not started" << endl;
             }
         }
+    }
+    else {
+        write_op_pos = 1;
     }
     if (server_addr.size()) {
         socket_fd = inetConnect(server_addr.c_str(),

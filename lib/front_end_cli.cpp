@@ -35,12 +35,36 @@ static void enqueuePos(op_t &p) {
     } 
 }
 
+int getInsertData(op_t &op, string &data, const string &line) {
+    if (!data.size() 
+        || (data[0] != '\\' && data.size() != 1)) 
+    {
+        errMsg("frontEndCli: syntax error: " + line);
+        return -1;
+    }
+    if (data[0] == '\\' && data.size() == 2) {
+        const static char *esc = "abfnrtv";
+        const static char *raw = "\a\b\f\n\r\t\v";
+        const char *pos = strchr(esc, data[1]);
+        if (pos == NULL) {
+            errMsg("frontEndCli: No such escaped character: "
+                   + data);
+            return -1;
+        }
+        data[0] = *((unsigned long)pos
+                    - (unsigned long)esc + raw);
+    }
+    op.data = data[0];
+    return 0;
+}
+
 /* the front-end function */
 void frontEndCli(textOp &file, istream &in) {
     string line, cmd, data;
     op_t op, saved_op;
     pos_t tmp_pos;
     char delete_char;
+    int flags = write_op ? (write_op_pos ? TM_WROP : TM_WROPOFF) : 0;
     for (shellPrompt(); getline(in, line); shellPrompt()) {
         if (line.size() == 0) {
             continue;
@@ -89,78 +113,62 @@ void frontEndCli(textOp &file, istream &in) {
                 writeOpFifo(saved_op);
                 break;
             case CH_DELETE:
-                msg = file.deleteCharAt(offset, &delete_char, &saved_op.pos);
-                PROMPT_ERROR(msg);
+                msg = file.deleteCharAt(offset, &delete_char,
+                                        &saved_op.pos, &flags);
                 if (msg == NOERR) {
-                    op.data = delete_char;
-                    op.char_offset = offset;
                     saved_op.data = delete_char;
                     saved_op.operation = DELETE;
                     enqueuePos(saved_op);
-                    if (write_op) {
-                        writeOpFifo(op);
-                    }
+                }
+                else {
+                    PROMPT_ERROR(msg);
                 }
                 break;
-            case DELETE: {
-                msg = file.deleteChar(op.pos, &delete_char);
-                PROMPT_ERROR(msg);
+            case DELETE:
+                msg = file.deleteChar(op.pos, &delete_char,
+                                      NULL, &flags);
                 if (msg == NOERR) {
                     op.data = delete_char;
                     enqueuePos(op);
-                    if (write_op) {
-                        writeOpFifo(op);
-                    }
+                }
+                else {
+                    PROMPT_ERROR(msg);
                 }
                 break;
-            }
             case CH_INSERT:
-                op.pos = file.translateOffset(offset);
-                saved_op.char_offset = offset;
-                if (op.pos.lineno < 1) {
-                    PROMPT_ERROR("translateOffset: offset out of range "
-                                 + to_string(offset));
-                    break;
-                }
-            case INSERT: {
-                if (!data.size() 
-                    || (data[0] != '\\' && data.size() != 1)) 
-                {
-                    errMsg("frontEndCli: syntax error: " + line);
+                if (getInsertData(op, data, line) != 0) {
                     continue;
                 }
-                if (data[0] == '\\' && data.size() == 2) {
-                    const static char *esc = "abfnrtv";
-                    const static char *raw = "\a\b\f\n\r\t\v";
-                    const char *pos = strchr(esc, data[1]);
-                    if (pos == NULL) {
-                        errMsg("frontEndCli: No such escaped character: "
-                               + data);
-                        continue;
-                    }
-                    data[0] = *((unsigned long)pos
-                                - (unsigned long)esc + raw);
-                }
-                op.data = data[0];
-                saved_op.data = data[0];
-                msg = file.insertChar(op.pos, (char)op.data);
-                PROMPT_ERROR(msg);
+                msg = file.insertCharAt(offset, op.data,
+                                        &saved_op.pos, &flags);
                 if (msg == NOERR) {
-                    op.operation = INSERT;
-                    enqueuePos(op);
-                    if (write_op) {
-                        writeOpFifo(saved_op);
-                    }
+                    saved_op.data = op.data;
+                    saved_op.operation = INSERT;
+                    enqueuePos(saved_op);
+                }
+                else {
+                    PROMPT_ERROR(msg);
                 }
                 break;
-            }
-            case PRINT: {
+            case INSERT:
+                if (getInsertData(op, data, line) != 0) {
+                    continue;
+                }
+                msg = file.insertChar(op.pos, op.data,
+                                      NULL, &flags);
+                if (msg == NOERR) {
+                    enqueuePos(op);
+                }
+                else {
+                    PROMPT_ERROR(msg);
+                }
+                break;
+            case PRINT:
                 if (op.pos.lineno < 1) {
                     op.pos.lineno = 1;
                 }
                 file.printLines(op.pos.lineno, op.pos.offset);
                 break;
-            }
             case SAVE: {
                 stringstream ss2(line);
                 ss2 >> cmd >> data;
@@ -169,9 +177,8 @@ void frontEndCli(textOp &file, istream &in) {
                 buf_changed = 1;
                 break;
             }
-            default: {
+            default:
                 errMsg("frontEndCli: no such operation '" + cmd + "'");
-            }
         }
     }
 }

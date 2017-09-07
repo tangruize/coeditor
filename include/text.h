@@ -41,28 +41,44 @@ public:
     void printLines(int start = 1, int count = -1, bool lineno = true);
 
     /* delete a character, if offset is 0, will join a line */
-    virtual prompt_t deleteChar(pos_t pos, char *c = NULL);
+    virtual prompt_t deleteChar(pos_t pos, char *c = NULL,
+                                uint64_t *off = NULL, int *flags = NULL);
 
     /* insert a character, if it is a newline, will add a line */
-    virtual prompt_t insertChar(pos_t pos, char c);
+    virtual prompt_t insertChar(pos_t pos, char c,
+                                uint64_t *off = NULL, int *flags = NULL);
 
     /* delete a character at given file offset */
     virtual prompt_t deleteCharAt(uint64_t off, char *c = NULL,
-                                  pos_t *p = NULL);
+                                  pos_t *p = NULL, int *flags = NULL);
 
     /* insert a character at given file offset */
     virtual prompt_t insertCharAt(uint64_t off, char c,
-                                  pos_t *p = NULL);
+                                  pos_t *p = NULL, int *flags = NULL);
 
     /* save file */
     prompt_t saveFile(const string &filename = "",
                 ios_base::openmode mode = ios::out | ios::trunc);
 
     /* translate (row, col) to file offset */
-    uint64_t translatePos(const pos_t pos);
+    virtual uint64_t translatePos(const pos_t pos);
 
     /* translate file offset to (row, col) */
-    pos_t translateOffset(uint64_t offset);
+    virtual pos_t translateOffset(uint64_t offset);
+
+    /* lock buf to prevent editing */
+    virtual void lock() {
+        return;
+    }
+
+    virtual void unlock() {
+        return;
+    }
+
+    /* meaningless in base class */
+    virtual bool isLocked() const {
+        return false;
+    }
 
     /* get file name */
     string getFilename() const {

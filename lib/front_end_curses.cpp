@@ -61,6 +61,7 @@ typedef const vector<const char *> status_t;
 
 bool readonly_flag = false;
 bool new_file_flag = false;
+int flags;
 
 /* format 1: status bar (last 2 lines),
  * each token's first 2 chars will draw in reverse color
@@ -1273,24 +1274,18 @@ int exitEditor() {
     return -1;
 }
 
+void printOtProcessing() {
+    status_t msg = { "Please wait while OT is processing..." };
+    redraw(RD_STMSG | SM_IMMEDIATE, &msg);
+}
+
 /* insert */
 void insertChar(int ch) {
-    op_t op;
-    if (!write_op_pos) {
-       op.char_offset = editing_file->translatePos(cur_pos);
-    }
-    if (editing_file->insertChar(cur_pos, ch) == NOERR) {
-        if (write_op_pos) {
-            op.pos = cur_pos;
-            op.data = ch;
-            op.operation = INSERT;
-            writeOpFifo(op);
-        }
-        else if (op.char_offset != (uint64_t)-1) {
-            op.data = ch;
-            op.operation = CH_INSERT;
-            writeOpFifo(op);
-        }
+    flags &= ~TM_AGAIN;
+    editing_file->insertChar(cur_pos, ch, NULL, &flags);
+    if (flags & TM_AGAIN) {
+        printOtProcessing();
+        return;
     }
     if (ch == '\n') {
         cur_pos.offset = 1;
@@ -1312,7 +1307,7 @@ void insertChar(int ch) {
 void keyBackspace() {
     char ch = 0;
     string del_result;
-    op_t op;
+    flags &= ~TM_AGAIN;
     if (cur_pos.offset <= 1) {
         if (cur_pos.lineno > 1) {
             cur_pos.offset = INT_MAX;
@@ -1323,13 +1318,12 @@ void keyBackspace() {
                 --cur_pos.lineno;
                 redraw();
             }
-            if (!write_op_pos) {
-                op.char_offset = editing_file->translatePos(cur_pos);
+            del_result = editing_file->deleteChar(cur_pos, &ch,
+                                                  NULL, &flags);
+            if (flags & TM_AGAIN) {
+                printOtProcessing();
+                return;
             }
-            else {
-                op.pos = cur_pos;
-            }
-            del_result = editing_file->deleteChar(cur_pos, &ch);
             redraw();
         }
         else {
@@ -1339,26 +1333,14 @@ void keyBackspace() {
     }
     else {
         --cur_pos.offset;
-        if (!write_op_pos) {
-            op.char_offset = editing_file->translatePos(cur_pos);
+        del_result = editing_file->deleteChar(cur_pos, &ch,
+                                              NULL, &flags);
+        if (flags & TM_AGAIN) {
+            printOtProcessing();
+            ++cur_pos.offset;
+            return;
         }
-        else {
-            op.pos = cur_pos;
-        }
-        del_result = editing_file->deleteChar(cur_pos, &ch);
         redrawCurLine();
-    }
-    if (del_result == NOERR) {
-        if (write_op_pos) {
-            op.data = ch;
-            op.operation = DELETE;
-            writeOpFifo(op);
-        }
-        else if (op.char_offset != (uint64_t)-1) {
-            op.data = ch;
-            op.operation = CH_DELETE;
-            writeOpFifo(op);
-        }
     }
 }
 
@@ -1366,40 +1348,24 @@ void keyBackspace() {
 void keyDelete() {
     char ch = 0;
     string del_result;
-    op_t op;
+    flags &= ~TM_AGAIN;
     if (cur_pos.offset <= cur_line_size + 1) {
         if (cur_pos.offset == cur_line_size + 1
             && cur_pos.lineno == editing_file->getTotalLines())
         {
             return;
         }
-        if (!write_op_pos) {
-           op.char_offset = editing_file->translatePos(cur_pos);
+        del_result = editing_file->deleteChar(cur_pos, &ch,
+                                              NULL, &flags);
+        if (flags & TM_AGAIN) {
+            printOtProcessing();
+            return;
         }
-        else {
-            op.pos = cur_pos;
-        }
-        del_result = editing_file->deleteChar(cur_pos, &ch);
         if (cur_pos.offset == cur_line_size + 1) {
             redraw();
         }
         else {
             redrawCurLine();
-        }
-    }
-    else {
-        return;
-    }
-    if (del_result == NOERR) {
-        if (write_op_pos) {
-            op.data = ch;
-            op.operation = DELETE;
-            writeOpFifo(op);
-        }
-        else if (op.char_offset != (uint64_t)-1) {
-            op.data = ch;
-            op.operation = CH_DELETE;
-            writeOpFifo(op);
         }
     }
 }
@@ -1792,6 +1758,10 @@ int calPos() {
     if (screen_start_line < 1) {
         screen_start_line = 1;
     }
+    int total_lines = editing_file->getTotalLines();
+    if (cur_pos.lineno > total_lines) {
+        cur_pos.lineno = total_lines;
+    }
     return need_redraw;
 }
 
@@ -2049,6 +2019,8 @@ void control() {
 /* the front-end function using curses */
 extern "C" void frontEndCurses(textOp &file) {
     editing_file = &file;
+    flags = write_op_pos ? TM_WROP : TM_WROPOFF;
+    flags |= TM_TRYLOCK;
     initCurses();
     readCacheFile();
     control();

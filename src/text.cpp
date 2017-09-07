@@ -223,19 +223,30 @@ pos_t textOp::translateOffset(uint64_t offset) {
 }
 
 /* delete a character, if offset is 0, will join a line */
-prompt_t textOp::deleteChar(pos_t pos, char *c) {
+prompt_t
+textOp::deleteChar(pos_t pos, char *c, uint64_t *off, int *flags) {
+    if (off) {
+        *off = textOp::translatePos(pos);
+        if (*off == (uint64_t)-1 || *off == total_chars) {
+            return "deleteChar: position out of range (" 
+                   + to_string(pos.lineno) + ", " 
+                   + to_string(pos.offset) + ")";
+        }
+    }
     assert(cerr << "Deleting (" << pos.lineno << ", " 
                 << pos.offset << ")\n");
     assert(cerr << "---Locating line " << pos.lineno << '\n');
     file_t::iterator it = textOp::locateLine(pos.lineno);
-    if (it == edit_file.end() || it->line.size() + 1 < pos.offset
-        || pos.offset < 1
-        || (pos.lineno == edit_file.size()
-        && it->line.size() + 1 == pos.offset))
-    {
-        return "deleteChar: position out of range (" 
-               + to_string(pos.lineno) + ", " 
-               + to_string(pos.offset) + ")";
+    if (!off) {
+        if (it == edit_file.end() || it->line.size() + 1 < pos.offset
+            || pos.offset < 1
+            || (pos.lineno == edit_file.size()
+            && it->line.size() + 1 == pos.offset))
+        {
+            return "deleteChar: position out of range (" 
+                   + to_string(pos.lineno) + ", " 
+                   + to_string(pos.offset) + ")";
+        }
     }
     char delete_char;
     --total_chars;
@@ -276,7 +287,16 @@ prompt_t textOp::deleteChar(pos_t pos, char *c) {
 }
 
 /* insert a character, if it is a newline, will add a line */
-prompt_t textOp::insertChar(pos_t pos, char c) {
+prompt_t
+textOp::insertChar(pos_t pos, char c, uint64_t *off, int *flags) {
+    if (off) {
+        *off = textOp::translatePos(pos);
+        if (*off == (uint64_t)-1) {
+            return "insertChar: position out of range (" 
+                   + to_string(pos.lineno) + ", " 
+                   + to_string(pos.offset) + ")";
+        }
+    }
     #ifndef NDEBUG
     cerr << "Inserting '";
     if (isprint(c)) {
@@ -290,12 +310,14 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
     #endif
     assert(cerr << "---Locating line " << pos.lineno << '\n');
     file_t::iterator it = textOp::locateLine(pos.lineno);
-    if (it == edit_file.end() || it->line.size() + 1 < pos.offset
-        || pos.offset < 1)
-    {
-        return "insertChar: position out of range (" 
-               + to_string(pos.lineno) + ", " 
-               + to_string(pos.offset) + ")";
+    if (!off) {
+        if (it == edit_file.end() || it->line.size() + 1 < pos.offset
+            || pos.offset < 1)
+        {
+            return "insertChar: position out of range (" 
+                   + to_string(pos.lineno) + ", " 
+                   + to_string(pos.offset) + ")";
+        }
     }
     assert(cerr << "---before ins: " << it->line << endl);
     ++total_chars;
@@ -336,8 +358,9 @@ prompt_t textOp::insertChar(pos_t pos, char c) {
 }
 
 /* delete a character at given file offset */
-prompt_t textOp::deleteCharAt(uint64_t off, char *c, pos_t *p) {
-    pos_t pos = translateOffset(off);
+prompt_t
+textOp::deleteCharAt(uint64_t off, char *c, pos_t *p, int *flags) {
+    pos_t pos = textOp::translateOffset(off);
     if (pos.lineno < 1) {
         return "deleteCharAt: offset out of range: " + to_string(off);
     }
@@ -348,8 +371,9 @@ prompt_t textOp::deleteCharAt(uint64_t off, char *c, pos_t *p) {
 }
 
 /* insert a character at given file offset */
-prompt_t textOp::insertCharAt(uint64_t off, char c, pos_t *p) {
-    pos_t pos = translateOffset(off);
+prompt_t
+textOp::insertCharAt(uint64_t off, char c, pos_t *p, int *flags) {
+    pos_t pos = textOp::translateOffset(off);
     if (pos.lineno < 1) {
         return "insertCharAt: offset out of range: " + to_string(off);
     }

@@ -74,7 +74,13 @@ enum {LO_CHECK = 1, RE_CHECK = 2};
 static int error_check = LO_CHECK | RE_CHECK;
 void errorCheck(int fd, const op_t &orig_op) {
     trans_t msg;
-    ssize_t num_read = read(fd, &msg, sizeof(msg));
+    ssize_t num_read;
+    if (fd == LOCAL_FEEDBACK_FILENO) {
+        num_read = read(fd, &msg, sizeof(op_t));
+    }
+    else {
+        num_read = read(fd, &msg, sizeof(trans_t));
+    }
     if (num_read == sizeof(op_t)) {
         if (msg.op.operation < 0) {
             msg.op.operation = -msg.op.operation;
@@ -147,7 +153,6 @@ void Generate(const op_t &op) {
         writeServer(msg);
     }
     else {
-        /* wait for sync event */
         to_send.push(msg);
     }
     msg.state = local;
@@ -216,12 +221,11 @@ void Receive(trans_t &msg) {
 }
 
 /* delay before receive if delay time is set */
+void synReceive();
 void delayReceive(trans_t &msg) {
-    if (sleep_before_recv) {
-        to_recv.push(msg);
-    }
-    else {
-        Receive(msg);
+    to_recv.push(msg);
+    if (sleep_before_recv == 0.0) {
+        synReceive();
     }
 }
 
@@ -263,18 +267,40 @@ void synSend() {
 }
 
 /* apply server operations to local immediately */
+extern int ot_fd;
 void synReceive() {
+    op_t tmp;
+    memset(&tmp, 0, sizeof(op_t));
+    tmp.operation = RECV_SYN;
+    if (write(TO_LOCAL_FILENO, &tmp, sizeof(tmp)) == -1) {
+        return;
+    }
+    while (read(FROM_LOCAL_FILENO, &tmp, sizeof(op_t)) == sizeof(op_t)) {
+        if (tmp.operation == NOOP) {
+            break;
+        }
+        if (tmp.operation == 'D' || tmp.operation == 'I') {
+            Generate(tmp);
+        }
+        else if (tmp.operation == 'U') {
+            synSend();
+        }
+    }
     while (to_recv.size()) {
         const trans_t &t = to_recv.front();
         trans_t msg = t;
         Receive(msg);
         to_recv.pop();
     }
+    memset(&tmp, 0, sizeof(op_t));
+    tmp.operation = NOOP;
+    write(TO_LOCAL_FILENO, &tmp, sizeof(tmp));
+    write(ot_fd, &tmp, sizeof(tmp));
 }
 
 void synchronize() {
-    synSend();
     synReceive();
+    synSend();
 }
 
 /* timer for receive event */
@@ -319,6 +345,8 @@ void initTimer() {
 void sigHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         /* synchronize all and then exit, so that data won't lose */
+        /* exit immediately if twice signaled */
+        signal(sig, SIG_DFL);
         synchronize();
         exit(EXIT_SUCCESS);
     }
@@ -326,7 +354,7 @@ void sigHandler(int sig) {
 
 void initSignal() {
     struct sigaction sa;
-    sa.sa_flags = SA_RESTART;
+    sa.sa_flags = SA_RESTART | SA_NODEFER;
     sa.sa_handler = sigHandler;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &sa, NULL) == -1
@@ -341,6 +369,21 @@ void initSignal() {
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
         cerr << "ERROR: signal: " << strerror(errno) << endl;
         exit(EXIT_FAILURE);
+    }
+}
+
+int debug_fd = -1, ot_fd = -1;
+void initDebug() {
+    char buf[32];
+    sprintf(buf, "debug_%ld", (long)getpid());
+    debug_fd = open(buf, O_WRONLY | O_CREAT, 0644);
+    if (debug_fd == -1) {
+        cerr << "open debug fd: " << strerror(errno) << endl;
+    }
+    sprintf(buf, "ot_%ld", (long)getpid());
+    ot_fd = open(buf, O_WRONLY | O_CREAT, 0644);
+    if (ot_fd == -1) {
+        cerr << "open debug fd: " << strerror(errno) << endl;
     }
 }
 
@@ -378,6 +421,7 @@ int main(int argc, char *argv[]) {
     initErrorCheck();
     initSignal();
     initTimer();
+    initDebug();
     trans_t msg;
     uint64_t exp;
     int poll_ret, fd_num = 2;
@@ -395,6 +439,7 @@ int main(int argc, char *argv[]) {
                     if (read(fds[i].fd, &msg.op, sizeof(op_t))
                         == sizeof(op_t))
                     {
+                        write(debug_fd, &msg.op, sizeof(op_t));
                         if (msg.op.operation == SYN) {
                             /* user synchronism signal */
                             synchronize();
