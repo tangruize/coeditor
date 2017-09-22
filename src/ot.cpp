@@ -23,25 +23,14 @@
 
 //#define DEBUG
 
-#define FROM_LOCAL_FILENO      0
-#define TO_LOCAL_FILENO        1
-/* do not override STDERR_FILENO */
-#define FROM_SERVER_FILENO     3
-#define TO_SERVER_FILENO       4
-#define LOCAL_FEEDBACK_FILENO  5
-#define SERVER_FEEDBACK_FILENO 6
+queue<trans_t> to_send;
+queue<trans_t> to_recv;
 
 struct pollfd fds[4] = {
-    {FROM_LOCAL_FILENO, POLLIN, 0},
-    {FROM_SERVER_FILENO, POLLIN, 0},
     {-1, POLLIN, 0},
     {-1, POLLIN, 0},
 };
 
-unsigned local, global;
-list<trans_t> outgoing;
-queue<trans_t> to_send;
-queue<trans_t> to_recv;
 double sleep_before_send = 0.0;
 double sleep_before_recv = 0.0;
 
@@ -144,81 +133,7 @@ void writeServer(const trans_t &msg) {
     }
 }
 
-void Generate(const op_t &op) {
-    trans_t msg;
-    msg.op = op;
-    msg.state = global;
-    if (sleep_before_send == 0.0) {
-        /* synchronize immediately */
-        writeServer(msg);
-    }
-    else {
-        to_send.push(msg);
-    }
-    msg.state = local;
-    outgoing.push_back(msg);
-    ++local;
-}
 
-void Receive(trans_t &msg) {
-    #ifdef DEBUG
-    cerr << "state: " << msg.state << ", ";
-    printError(msg.op);
-    #endif
-    /* Discard acknowledged messages. */
-    for (list<trans_t>::iterator m = outgoing.begin();
-         m != outgoing.end(); ++m)
-    {
-        if (m->state < msg.state) {
-            list<trans_t>::iterator pre = m;
-            --pre;
-            outgoing.erase(m);
-            m = pre;
-        }
-    }
-    /* ASSERT msg.myMsgs == otherMsgs. */
-    /*if (msg.state.client != state.server) {
-        cerr << "WARNING: msg.state.client (" << msg.state.client
-             << ") != state.server (" << state.server << ")\n";
-    }*/
-    for (list<trans_t>::iterator i = outgoing.begin();
-         i != outgoing.end(); ++i)
-    {
-        #ifdef DEBUG
-        cerr << "---before ot: ";
-        printError(msg.op, false);
-        cerr << " AND ";
-        printError((*i).op);
-        #endif
-        /* Transform new message and the ones in the queue. */
-        if (xformClient(msg.op, (*i).op) != 0) {
-            #ifdef DEBUG
-            cerr << "---after  ot: ";
-            printError(msg.op, false);
-            cerr << " AND ";
-            printError((*i).op);
-            #endif
-            break;
-        }
-        #ifdef DEBUG
-        cerr << "---after  ot: ";
-        printError(msg.op, false);
-        cerr << " AND ";
-        printError((*i).op);
-        #endif
-    }
-    if (msg.op.operation != NOOP) {
-        if (write(TO_LOCAL_FILENO, &msg.op, sizeof(msg.op)) != -1) {
-            if (error_check & LO_CHECK) {
-                errorCheck(LOCAL_FEEDBACK_FILENO, msg.op);
-            }
-        }
-        else {
-            cerr << "ERROR: writing local: " << strerror(errno) << endl;
-        }
-    }
-    ++global;
-}
 
 /* delay before receive if delay time is set */
 void synReceive();
@@ -228,20 +143,6 @@ void delayReceive(trans_t &msg) {
         synReceive();
     }
 }
-
-/* error check may receive no data, prevent from blocking */
-/* PS: bad idea, error check may receive partial data */
-/*
-int setNonblock(int fd) {
-    int flags = fcntl(fd, F_GETFL);
-    if (flags == -1) {
-        return -1;
-    }
-    flags |= O_NONBLOCK;
-    fcntl(fd, F_SETFL, flags);
-    return 0;
-}
-*/
 
 /* if feedback fds is not open or is not ok, error check is disabled */
 void initErrorCheck() {
@@ -439,7 +340,6 @@ int main(int argc, char *argv[]) {
                     if (read(fds[i].fd, &msg.op, sizeof(op_t))
                         == sizeof(op_t))
                     {
-                        write(debug_fd, &msg.op, sizeof(op_t));
                         if (msg.op.operation == SYN) {
                             /* user synchronism signal */
                             synchronize();
@@ -451,6 +351,7 @@ int main(int argc, char *argv[]) {
                             synReceive();
                         }
                         else {
+                            write(debug_fd, &msg.op, sizeof(op_t));
                             Generate(msg.op);
                         }
                     }

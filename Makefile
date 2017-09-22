@@ -14,13 +14,3 @@ all:
 clean:
 	@ for dir in ${BUILD_DIRS}; do (cd $${dir}; ${MAKE} clean) ; done
 
-pre-use-cli:
-	@ cd lib; ${MAKE} cli
-
-pre-use-curses:
-	@ cd lib; ${MAKE} curses
-
-cli: pre-use-cli all
-
-curses: pre-use-curses all
-

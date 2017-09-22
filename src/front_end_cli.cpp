@@ -13,9 +13,6 @@
 #include "init.h"
 #include <unistd.h>
 
-/* using dynamic linking, C linkage is preferred */
-extern "C" {
-
 extern volatile int buf_changed;
 extern int write_op;
 
@@ -181,6 +178,4 @@ void frontEndCli(textOp &file, istream &in) {
                 errMsg("frontEndCli: no such operation '" + cmd + "'");
         }
     }
-}
-
 }

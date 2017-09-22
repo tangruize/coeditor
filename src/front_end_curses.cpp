@@ -2017,7 +2017,7 @@ void control() {
 }
 
 /* the front-end function using curses */
-extern "C" void frontEndCurses(textOp &file) {
+void frontEndCurses(textOp &file) {
     editing_file = &file;
     flags = write_op_pos ? TM_WROP : TM_WROPOFF;
     flags |= TM_TRYLOCK;

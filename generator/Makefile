@@ -1,21 +1,5 @@
-include ../Makefile.inc
-
-SRC = $(wildcard *.cpp)
-
 EXE = ../gen-op
 
 all : ${EXE}
 
-${EXE} : $(SRC:.cpp=.o)
-	${CXX} ${CXXFLAGS} -o $@ $^ ${LIBS}
-
-%.d: %.cpp
-	@set -e; rm -f $@; \
-		$(CXX) -MM $(CXXFLAGS) $< > $@.$$$$; \
-		sed 's,\($*\)\.o[ : ]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
-		rm -f $@.$$$$
-
--include $(SRC:.cpp=.d)
-
-clean :
-	${RM} ${EXE} ${EXE_STATIC} *.o *.d *.d.*
+include ../Makefile.inc

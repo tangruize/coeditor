@@ -106,6 +106,8 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < t; ++i) {
         const char *p = generator();
         cout << p << endl;
+        if (p[0] == 'D' || p[0] == 'I')
+        cerr << p << endl;
     }
     cout << cmd_l() << endl;
     return 0;

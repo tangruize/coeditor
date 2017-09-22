@@ -40,7 +40,13 @@ enum {
 
 struct trans_t {
     op_t op;
-    unsigned state;
+    union {
+        int64_t state;
+        struct {
+            int local;
+            int global;
+        };
+    };
 }__attribute__((packed));
 
 /* to authenticate while connecting server */
