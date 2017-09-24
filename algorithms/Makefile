@@ -1,4 +1,4 @@
-EXE = ../op-generator
+EXE = ../jupiter-server
 
 all : ${EXE}
 

@@ -50,10 +50,6 @@ const char *cmd_l() {
     return "l";
 }
 
-const char *cmd_s() {
-    return "s";
-}
-
 const char *cmd_D() {
     static char buf[32];
     if (size == 0) {

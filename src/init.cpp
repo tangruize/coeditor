@@ -28,6 +28,7 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <sys/timerfd.h>
+#include <ncurses.h>
 
 #define TRASH_FILE "/dev/null"
 
@@ -264,9 +265,9 @@ void synSend() {
         PROMPT_ERROR_EN_S("pthread_mutex_lock", s);
     }
     while (to_send.size()) {
-        const trans_t &t = to_recv.front();
+        const trans_t &t = to_send.front();
         doWriteRemote(t);
-        to_recv.pop();
+        to_send.pop();
     }
     s = pthread_mutex_unlock(&send_mtx);
     if (s != 0) {
@@ -458,6 +459,11 @@ static void sigHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         exit(EXIT_SUCCESS);
     }
+    else if (sig == SIGSEGV) {
+        endwin();
+        removeOutFileAtExit();
+        signal(sig, SIG_DFL);
+    }
 }
 
 void initSignal() {
@@ -466,7 +472,8 @@ void initSignal() {
     sa.sa_handler = sigHandler;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGINT, &sa, NULL) == -1
-        || sigaction(SIGTERM, &sa, NULL) == -1)
+        || sigaction(SIGTERM, &sa, NULL) == -1
+        || sigaction(SIGSEGV, &sa, NULL) == -1)
     {
         PROMPT_ERROR_EN("Error establishing signal handlers");
         exit(EXIT_FAILURE);

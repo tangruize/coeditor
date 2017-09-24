@@ -1,1 +1,0 @@
-script/checker.sh

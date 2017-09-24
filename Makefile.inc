@@ -7,9 +7,6 @@ CXXFLAGS = -std=c++11 \
 		-Wno-sign-compare \
 		-Wno-unused-parameter -DNDEBUG
 
-ifndef LDFLAGS
-LDFLAGS = 
-endif
 ifndef EXE
 EXE = dummy
 endif
