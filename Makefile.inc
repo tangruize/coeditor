@@ -5,7 +5,7 @@ CXXFLAGS = -std=c++11 \
 		-Wall \
 		-Wextra \
 		-Wno-sign-compare \
-		-Wno-unused-parameter #-DNDEBUG
+		-Wno-unused-parameter -DNDEBUG
 
 ifndef LDFLAGS
 LDFLAGS = 

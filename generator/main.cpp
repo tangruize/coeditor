@@ -10,13 +10,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 using namespace std;
+//#define DEBUG
 
 int size = 0;
 
 void sleep_a_while(double s) {
-#ifndef NDEBUG
+#ifdef DEBUG
     struct timespec ts;
     long sec = s;
     ts.tv_sec = sec;
@@ -92,6 +96,21 @@ const char *generator() {
     return ret;
 }
 
+int getSeed() {
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd == -1) {
+        cerr << "cannot get seed" << endl;
+        exit(EXIT_FAILURE);
+    }
+    int seed;
+    if (read(fd, &seed, sizeof(seed)) < 0) {
+        cerr << "cannot read seed" << endl;
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+    return seed;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         cerr << "Usage: " << argv[0] << " [n times]" << endl;
@@ -102,12 +121,12 @@ int main(int argc, char *argv[]) {
         cerr << argv[0] << ": Invalid argument: " << argv[1] << endl;
         return 1;
     }
-    srand(time(NULL));
+    srand(getSeed());
     for (int i = 0; i < t; ++i) {
         const char *p = generator();
         cout << p << endl;
-        if (p[0] == 'D' || p[0] == 'I')
-        cerr << p << endl;
+        // if (p[0] == 'D' || p[0] == 'I')
+            // cerr << p << endl;
     }
     cout << cmd_l() << endl;
     return 0;

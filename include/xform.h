@@ -11,7 +11,7 @@
 
 #include "op.h"
 
-int xformClient(op_t &op, op_t &outop);
-int xformServer(op_t &op, op_t &outop);
+int xform(op_t &op, op_t &outop);
+// int xformServer(op_t &op, op_t &outop);
 
 #endif

@@ -10,6 +10,7 @@
 #include "rdwrn.h"
 #include "common.h"
 #include "xform.h"
+#include "data_trans.h"
 #include <syslog.h>
 #include <unistd.h>
 #include <limits.h>
@@ -43,7 +44,7 @@ void releaseFileLock() {
     flock(readfd, LOCK_UN);
 }
 
-void login() {
+int login() {
     static int retry_times = 1;
     readfd = open(filename.c_str(), O_RDWR);
     if (readfd == -1) {
@@ -59,8 +60,7 @@ void login() {
                 /* file exists, race condition */
                 if (retry_times) {
                     --retry_times;
-                    login();
-                    return;
+                    return login();
                 }
                 else {
                     /* should not happen */
@@ -108,28 +108,27 @@ void login() {
         if (read(readfd, &tmp, sizeof(tmp)) != sizeof(tmp)) {
             exit(EXIT_FAILURE);
         }
-        if (tmp.client_id == fi.client_id) {
-            /* same id not allowed */
+        /*if (tmp.client_id == fi.client_id) {
             exit(EXIT_FAILURE);
-        }
+        }*/
         if (tmp.server_id == 0) {
             /* get the seat */
             break;
         }
     }
-    for (int j = i + 1; j < USER_MAX; ++j) {
+    /*for (int j = i + 1; j < USER_MAX; ++j) {
         if (read(readfd, &tmp, sizeof(tmp)) != sizeof(tmp)) {
             exit(EXIT_FAILURE);
         }
         if (tmp.client_id == fi.client_id) {
-            /* same id not allowed */
             exit(EXIT_FAILURE);
         }   
-    }
+    }*/
     if (i == USER_MAX) {
         /* no seat available, should not happen */
         exit(EXIT_FAILURE);
     }
+    fi.client_id = i;
     /* take the seat */
     pwrite(readfd, &fi, sizeof(fi), sizeof(n) + sizeof(fi) * i);
     ++n;
@@ -137,6 +136,7 @@ void login() {
     releaseFileLock();
     /* op start offset */
     lseek(readfd, SHM_OFFSET, SEEK_SET);
+    return i;
 }
 
 void logout() {
@@ -175,6 +175,14 @@ void logExitInfo() {
     syslog(LOG_INFO , "Jupiter server exiting [PID %ld]", (long)prog_id);
 }
 
+void writeLocal(const op_t &op) {
+    write(writefd, &op, sizeof(op));
+}
+
+void writeRemote(const trans_t &msg) {
+    write(STDOUT_FILENO, &msg, sizeof(msg));
+}
+
 /* send signal to any other servers */
 void notifyOtherServers() {
     file_id_t fi;
@@ -197,11 +205,7 @@ void writeClient(int sig) {
            == sizeof(op_t))
     {
         if (t.op.id != auth.id) {
-            t.state = local;
-            writen(STDOUT_FILENO, &t, sizeof(t));
-            t.state = global;
-            outgoing.push_back(t);
-            ++global;
+            procRemote(t.op);
         }
     }
     if (num_read != 0) {
@@ -220,79 +224,8 @@ void sigExitHandler(int sig) {
     exit(EXIT_SUCCESS);
 }
 
-#ifdef DEBUG
-#include <sstream>
-const char *strop(const op_t &op, char *buf2 = NULL) {
-    /* static buf, not reentrant. */
-    static char buf[32];
-    stringstream ss;
-    if (isalpha(op.operation)) {
-        ss << (char)op.operation;
-    }
-    else {
-        ss << (unsigned)op.operation;
-    }
-    ss << " ";
-    if (islower(op.operation)) {
-        ss << op.pos.lineno << " " << op.pos.offset << " ";
-    }
-    else {
-        ss << op.char_offset << " ";
-    }
-    ss << op.data;
-    if (buf2) {
-        /* reentrant. */
-        ss.getline(buf2, 31);
-        return buf2;
-    }
-    else {
-        ss.getline(buf, 31);
-        return buf;
-    }
-}
-#endif
-
-void transform(trans_t &loc) {
-    /* Discard acknowledged messages. */
-    for (list<trans_t>::iterator m = outgoing.begin();
-         m != outgoing.end(); ++m)
-    {
-        if (m->state < loc.state) {
-            list<trans_t>::iterator pre = m;
-            --pre;
-            outgoing.erase(m);
-            m = pre;
-        }
-    }
-    #ifdef DEBUG
-    char buf[32];
-    syslog(LOG_INFO, "[%hd]state: %d, %s", auth.id, loc.state,
-           strop(loc.op));
-    #endif
-    for (list<trans_t>::iterator i = outgoing.begin();
-         i != outgoing.end(); ++i)
-    {
-        #ifdef DEBUG
-        syslog(LOG_INFO, "---[%hd]before: %s AND %s", auth.id,
-               strop(loc.op), strop((*i).op, buf));
-        #endif
-        if (xformServer(loc.op, (*i).op) != 0) {
-            #ifdef DEBUG
-            syslog(LOG_INFO, "---[%hd]after : %s AND %s", auth.id,
-                   strop(loc.op), strop((*i).op, buf));
-            #endif
-            break;
-        }
-        #ifdef DEBUG
-        syslog(LOG_INFO, "---[%hd]after : %s AND %s", auth.id,
-               strop(loc.op), strop((*i).op, buf));
-        #endif
-    }
-}
-
 int main(int argc, char *argv[]) {
     trans_t data;
-    char auth_ok = 1;
     ssize_t num_read;
     prog_id = getpid();
     memset(&data, 0, sizeof(trans_t));
@@ -309,11 +242,11 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         filename += auth.md5sum;
-        login();
+        auth.id = login();
         atexit(logout);
         /* ack */
-        if (write(STDOUT_FILENO, &auth_ok, sizeof(auth_ok))
-            != sizeof(auth_ok)) {
+        if (write(STDOUT_FILENO, &auth, sizeof(auth))
+            != sizeof(auth)) {
             exit(EXIT_FAILURE);
         }
     }
@@ -342,13 +275,7 @@ int main(int argc, char *argv[]) {
         getFileLock();
         /* block sighup while writing (become deaf temporarily) */
         sigprocmask(SIG_BLOCK, &block_set, &prev_mask);
-        transform(data);
-        if (write(writefd, &data.op, sizeof(op_t))
-            != sizeof(op_t))
-        {
-            exit(EXIT_FAILURE);
-        }
-        ++local;
+        procClient(data);
         /* wake up other servers */
         notifyOtherServers();
         /* restore pre sigmask */

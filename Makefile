@@ -2,7 +2,7 @@
 # (The library directory is first so that the library gets built first)
 #
 
-DIRS = lib server ot src generator
+DIRS = lib server src generator
 
 BUILD_DIRS = ${DIRS}
 

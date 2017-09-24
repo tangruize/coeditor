@@ -45,7 +45,7 @@ struct trans_t {
         struct {
             int local;
             int global;
-        };
+        } states;
     };
 }__attribute__((packed));
 

@@ -1,4 +1,4 @@
-/*************************************************************************
+/************************************************************************
 	> File Name: xform.cpp
 	> Author: Tang Ruize
 	> Mail: 151220100@smail.nju.edu.cn
@@ -14,7 +14,7 @@
 
 using namespace std;
 
-int xform(op_t &op, op_t &outop, string &error) {
+static int _xform(op_t &op, op_t &outop, string &error) {
     if (op.operation == 0) {
         return 1;
     }
@@ -109,20 +109,22 @@ int xform(op_t &op, op_t &outop, string &error) {
     return 0;
 }
 
-int xformClient(op_t &op, op_t &outop) {
+int xform(op_t &op, op_t &outop) {
     string s;
-    int ret = xform(op, outop, s);
-    if (s.size()) {
-        cerr << s << endl;
-    }
+    int ret = _xform(op, outop, s);
+    // if (s.size()) {
+    //     cerr << s << endl;
+    // }
     return ret;
 }
 
+/*
 int xformServer(op_t &op, op_t &outop) {
     string s;
-    int ret = xform(op, outop, s);
+    int ret = _xform(op, outop, s);
     if (s.size()) {
         syslog(LOG_WARNING, "%s", s.c_str());
     }
     return ret;
 }
+*/

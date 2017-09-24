@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
                 write_op_pos = 1;
                 break;
             case 'w':
-                write_op = 1;
+                write_op = 0;
                 break;
             case 't':
                 ot_time_arg = optarg;
@@ -32,20 +32,11 @@ int main(int argc, char *argv[]) {
             case 'T':
                 ot_recv_time_arg = optarg;
                 break;
-            case 'o':
-                remove_fifo_ot = false;
-                break;
             case 'd':
                 no_debug = false;
                 break;
             case 'l':
-                no_cli = 0;
-                break;
-            case 'f':
-                lo_feedback = 0;
-                break;
-            case 'F':
-                re_feedback = 0;
+                no_cli = 0;  
                 break;
             default:
                 cerr << "Invalid arguments" << endl;

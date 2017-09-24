@@ -22,7 +22,7 @@ using namespace std;
 
 volatile int buf_changed = 0;
 volatile int ot_status = -1;
-int write_op = 0;
+int write_op = 1;
 int write_op_pos = 0;
 int no_cli = 1;
 int front_end_number_version = 2;
