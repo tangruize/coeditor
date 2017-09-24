@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:t:T:pwdolfF")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:T:pwdl")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;

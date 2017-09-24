@@ -11,6 +11,7 @@
 #include "common.h"
 #include "xform.h"
 #include "data_trans.h"
+#include "dll.h"
 #include <syslog.h>
 #include <unistd.h>
 #include <limits.h>
@@ -205,7 +206,7 @@ void writeClient(int sig) {
            == sizeof(op_t))
     {
         if (t.op.id != auth.id) {
-            procRemote(t.op);
+            (*fromLocal)(t.op);
         }
     }
     if (num_read != 0) {
@@ -231,6 +232,11 @@ int main(int argc, char *argv[]) {
     memset(&data, 0, sizeof(trans_t));
     syslog(LOG_INFO , "Jupiter server started [PID %ld]", (long)prog_id);
     atexit(logExitInfo);
+    const char *err = setDllFuncs(0);
+    if (err != NULL) {
+        syslog(LOG_ERR, "Error load dll: %s", err);
+        exit(EXIT_FAILURE);
+    }
     /* authenticate */
     if (readn(STDIN_FILENO, &auth, sizeof(auth)) != sizeof(auth)) {
         exit(EXIT_FAILURE);
@@ -275,7 +281,7 @@ int main(int argc, char *argv[]) {
         getFileLock();
         /* block sighup while writing (become deaf temporarily) */
         sigprocmask(SIG_BLOCK, &block_set, &prev_mask);
-        procClient(data);
+        (*fromNet)(data);
         /* wake up other servers */
         notifyOtherServers();
         /* restore pre sigmask */

@@ -24,7 +24,7 @@
 #include <sys/stat.h> /* stat() */
 #include <pwd.h>
 
-#define VERSION "1.1"
+//#define VERSION "1.1"
 
 extern pthread_t main_thread_id;
 extern volatile int buf_changed;
@@ -439,7 +439,11 @@ void redrawContent() {
 /* redraw title */
 void redrawTitle() {
     string filename = editing_file->getFilename();
-    const string prog_name = "  Coeditor " VERSION;
+    extern const char *ALGO_VER;
+    string prog_name_suffix = "";
+    if (ALGO_VER != NULL)
+        prog_name_suffix = string("(") + ALGO_VER + string(")");
+    const string prog_name = "  Coeditor " + prog_name_suffix;
     const char modified_str[] = "Modified";
     const char readonly_str[] = "Read-only";
     bool is_modified = editing_file->isModified();

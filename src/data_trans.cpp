@@ -6,8 +6,8 @@ extern textOp *edit_file;
 extern queue<op_t> *pos_to_transform;
 extern int buf_changed;
 extern int socket_fd;
-extern int send_timer_fd;
 extern queue<trans_t> to_send;
+extern double sleep_before_send;
 
 void printError(const op_t &op, bool newline = true) {
     if (isalpha(op.operation)) {
@@ -87,7 +87,7 @@ void doWriteRemote(const trans_t &msg) {
 
 /* write a message to server */
 void writeRemote(const trans_t &msg) {
-    if (send_timer_fd == -1) {
+    if (sleep_before_send == 0.0) {
         doWriteRemote(msg);
     }
     else {

@@ -15,6 +15,7 @@
 #include "front_end.h"
 #include "inet_sockets.h"
 #include "data_trans.h"
+#include "dll.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -287,7 +288,7 @@ void *sendTimer_Thread(void *args) {
 void procServerWrapper(const trans_t &t) {
     edit_file->lock();
     while (local_ops.size());
-    procServer(t);
+    (*fromNet)(t);
     edit_file->unlock();
 }
 
@@ -366,7 +367,7 @@ void *writeOp_Thread(void *args) {
         /* Consume all available units */
         while (local_ops.size()) {
             const op_t &op = local_ops.front();
-            procLocal(op);
+            (*fromLocal)(op);
             local_ops.pop();
         }
         s = pthread_mutex_unlock(&mtx);
@@ -381,21 +382,23 @@ void *readServer_Thread(void *args) {
     pthread_detach(pthread_self());
     trans_t t;
     ssize_t num_read;
-    if (recv_timer_fd == -1) {
+    if (sleep_before_recv == 0.0) {
         while ((num_read = readn(socket_fd, &t, sizeof(trans_t))) > 0) {
             procServerWrapper(t);
         }
     }
     else {
-        pthread_t t1;
-        int s = pthread_create(&t1, NULL, recvTimer_Thread, NULL);
-        if (s != 0) {
-            PROMPT_ERROR_EN_S("recv timer", s);
-            close(recv_timer_fd);
-            recv_timer_fd = -1;
+        if (recv_timer_fd != -1) {
+            pthread_t t1;
+            int s = pthread_create(&t1, NULL, recvTimer_Thread, NULL);
+            if (s != 0) {
+                PROMPT_ERROR_EN_S("recv timer", s);
+                close(recv_timer_fd);
+                recv_timer_fd = -1;
+            }
         }
         while ((num_read = readn(socket_fd, &t, sizeof(trans_t))) > 0) {
-            if (recv_timer_fd != -1)
+            if (recv_timer_fd != -1 || sleep_before_recv < 0)
                 to_recv.push(t);
             else
                 procServerWrapper(t);
@@ -467,6 +470,7 @@ static void sigHandler(int sig) {
 }
 
 void initSignal() {
+    signal(SIGPIPE, SIG_IGN);
     struct sigaction sa;
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = sigHandler;
@@ -491,15 +495,15 @@ void init() {
     }
     pos_to_transform = new queue<op_t>;
     if (server_addr.size()) {
+        const char *err = setDllFuncs(1);
+        if (err != NULL) {
+            cerr << "Error: " << err << endl;
+            exit(EXIT_FAILURE);
+        }
         int s = pthread_create(&write_op_id, NULL, writeOp_Thread, NULL);
         if (s != 0) {
             cerr << "OP output not started" << endl;
         }
-    }
-    else {
-        write_op_pos = 1;
-    }
-    if (server_addr.size()) {
         socket_fd = inetConnect(server_addr.c_str(),
                                 "13127", SOCK_STREAM);
         if (socket_fd == -1) {
@@ -533,7 +537,7 @@ void init() {
             }
             close(md5_fd);
         }
-        cerr << "Connecting " << server_addr << "..." << endl;
+        cerr << "Connecting " << server_addr << " ..." << endl;
         if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
             || read(socket_fd, &auth, sizeof(auth)) <=0)
         {
@@ -541,21 +545,24 @@ void init() {
         }
         program_id = auth.id;
         pthread_t read_server_id;
-        int s = pthread_create(&read_server_id, NULL, readServer_Thread,
+        s = pthread_create(&read_server_id, NULL, readServer_Thread,
                                NULL);
         if (s != 0) {
             cerr << "Server output not started" << endl;
         }
-    }
-    if (send_timer_fd != -1) {
-        pthread_t send_timer_id;
-        int s = pthread_create(&send_timer_id, NULL, sendTimer_Thread,
-                               NULL);
-        if (s != 0) {
-            cerr << "Send timer not started" << endl;
-            close(send_timer_fd);
-            send_timer_fd = -1;
+        if (sleep_before_send > 0) {
+            pthread_t send_timer_id;
+            int s = pthread_create(&send_timer_id, NULL, sendTimer_Thread,
+                                   NULL);
+            if (s != 0) {
+                cerr << "Send timer not started" << endl;
+                close(send_timer_fd);
+                send_timer_fd = -1;
+            }
         }
+    }
+    else {
+        write_op_pos = 1;
     }
     edit_file->loadFile(edit_file->getFilename());
     //prompt_t msg = edit_file->loadFile(edit_file->getFilename());

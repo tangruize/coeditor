@@ -1,5 +1,7 @@
 #include "data_trans.h"
 
+const char *ALGO_VER = "CSCW";
+
 static unsigned local, global;
 static list<trans_t> outgoing;
 

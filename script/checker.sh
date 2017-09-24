@@ -2,14 +2,14 @@
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
-TEMP=`getopt -o c:t:T:n:wpfF -n $0 -- "$@"`
+TEMP=`getopt -o c:t:T:n:wp -n $0 -- "$@"`
 if [ $? != 0 ]; then echo "Terminating..." >&2; exit 1; fi
 eval set -- "$TEMP"
 
 SLEEP_TIME=
 RECV_TIME=
 SERVER_ADDR=" -c localhost"
-COEDITOR_ARGS=" -F "
+COEDITOR_ARGS=
 GEN_NUM="1000"
 
 while true; do
@@ -20,8 +20,6 @@ while true; do
         -n) GEN_NUM="$2"; shift 2;;
         -w) COEDITOR_ARGS="$COEDITOR_ARGS -w "; shift;;
         -p) COEDITOR_ARGS="$COEDITOR_ARGS -p "; shift;;
-        -f) COEDITOR_ARGS="$COEDITOR_ARGS -f "; shift;;
-        -F) COEDITOR_ARGS="$COEDITOR_ARGS -F "; shift;;
         --) shift; break;;
         *)  echo "Internal error!" >&2; exit 1;;
     esac
@@ -67,51 +65,23 @@ k=1
 PIDS[0]=$$
 for i in ${EDIT_NAME[@]}; do
     INVOKE_COEDITOR_ARGS="$COEDITOR_ARGS $SERVER_ADDR $i"
-    gnome-terminal --title="client $k" -e "$EXE $INVOKE_COEDITOR_ARGS -wold"
-    TRY_TIMES=30
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.server.input.feedback &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.server.input &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.server.output &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.local.op.input.feedback &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.local.op.input &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.local.op.output &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
+    gnome-terminal --title="client $k" -e "$EXE $INVOKE_COEDITOR_ARGS -ld"
+    TRY_TIMES=10
     while [ $TRY_TIMES -ne 0 ] && ! eval ls ${PREFIX}.${i}*.debug &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    if [ $TRY_TIMES -eq 0 ]; then
-        echo timeout: pipe files not detected for client $k
-        kill -INT ${PIDS[*]} &>/dev/null
-        kill -- -$$ &> /dev/null
-        exit 1
-    fi
     DEBUG_FILE=$(ls ${PREFIX}.${i}*.debug)
-    LOCAL_OP=$(ls ${PREFIX}.${i}*.local.op.output)
-    LOCAL_OP_IN=$(ls ${PREFIX}.${i}*.local.op.input)
-    LOCAL_OP_IN_F=$(ls ${PREFIX}.${i}*.local.op.input.feedback)
-    SERVER_OP=$(ls ${PREFIX}.${i}*.server.output)
-    SERVER_OP_IN=$(ls ${PREFIX}.${i}*.server.input)
-    SERVER_OP_IN_F=$(ls ${PREFIX}.${i}*.server.input.feedback)
     EXE_PID=${DEBUG_FILE#$PREFIX.${i}.}
     EXE_PID=${EXE_PID%.debug}
     PIDS[$((k-1))]=$EXE_PID
     echo -e "\033[$((k+30))mclient $k: $EXE_PID\033[0m"
-    ${EXE_DIR}/jupiter-ot 0< ${LOCAL_OP} 1>| ${LOCAL_OP_IN} 3< ${SERVER_OP} 4>| ${SERVER_OP_IN} 5< ${LOCAL_OP_IN_F} 6< ${SERVER_OP_IN_F} 2> ${EDIT_DIR}/.ot.${i} $SLEEP_TIME $RECV_TIME &
-#    rm -f ${LOCAL_OP} ${LOCAL_OP_IN} ${LOCAL_OP_IN_F} ${SERVER_OP} ${SERVER_OP_IN} ${SERVER_OP_IN_F}
-    while [ $TRY_TIMES -ne 0 ] && ! eval ls ${EDIT_DIR}/.ot.${i} &> /dev/null; do sleep 0.1; TRY_TIMES=$((TRY_TIMES-1)); done
-    tail --pid=${EXE_PID} -f ${EDIT_DIR}/.ot.${i} | sed -e "s/^/\x1b[$((k+30))m/" -e 's/$/\x1b[0m/' && kill -- -$$ &
     gnome-terminal --title="debug $k" -e "tail --pid=$EXE_PID -f $DEBUG_FILE "
     k=$((k+1))
 done
 
-sleep 1
-${EXE_DIR}/script/reproduce.sh /tmp/jupiter-server-d41d8cd98f00b204e9800998ecf8427e > /dev/null &
 read -p "Ready? " ok
-sleep 1
 for i in ${PIDS[@]}; do
     CLI_FILE=$(ls ${PREFIX}*${i}*.cli)
-    ${EXE_DIR}/gen-op $GEN_NUM > $CLI_FILE 2> gen_op_$RANDOM &
+    ${EXE_DIR}/op-generator $GEN_NUM > $CLI_FILE &
 done
-
-sleep 1
-rm -f ${PREFIX}.* ${EDIT_DIR}/.ot.*
 
 trap "kill -INT ${PIDS[*]} $SERVER_PID &>/dev/null;trap "" 2 15;kill -- -$$ &> /dev/null" 2 15
 

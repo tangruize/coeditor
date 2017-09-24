@@ -1,3 +1,5 @@
+CXXFLAGS := -fPIC
+
 TARGET = libcoeditor.a
 
 all : ${TARGET}

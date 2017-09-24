@@ -1,5 +1,5 @@
 INC_DIR = ../include
-CXXFLAGS = -std=c++11 \
+CXXFLAGS += -std=c++11 \
 		-g -I${INC_DIR} \
 		-pedantic \
 		-Wall \
@@ -31,4 +31,4 @@ ${EXE} : $(SRC:.cpp=.o) ${LIBS}
 -include $(SRC:.cpp=.d)
 
 clean :
-	${RM} ${EXE} ${EXE_STATIC} *.o *.d *.d.* *.a
+	${RM} ${EXE} ${EXE_STATIC} *.o *.d *.d.* *.a *.so
