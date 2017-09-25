@@ -49,6 +49,7 @@ double sleep_before_recv = 0.0;
 
 int send_timer_fd = -1, recv_timer_fd = -1;
 int socket_fd = -1;
+int can_sim = 0;
 
 queue<trans_t> to_send;
 queue<trans_t> to_recv;
@@ -258,6 +259,7 @@ static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t recv_mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t send_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t algo_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 void doWriteRemote(const trans_t &msg);
 void synSend() {
@@ -288,7 +290,9 @@ void *sendTimer_Thread(void *args) {
 void procServerWrapper(const trans_t &t) {
     edit_file->lock();
     while (local_ops.size());
+    if (can_sim == 0) pthread_mutex_lock(&algo_mtx);
     (*fromNet)(t);
+    if (can_sim == 0) pthread_mutex_unlock(&algo_mtx);
     edit_file->unlock();
 }
 
@@ -367,7 +371,9 @@ void *writeOp_Thread(void *args) {
         /* Consume all available units */
         while (local_ops.size()) {
             const op_t &op = local_ops.front();
+            if (can_sim == 0) pthread_mutex_lock(&algo_mtx);
             (*fromLocal)(op);
+            if (can_sim == 0) pthread_mutex_unlock(&algo_mtx);
             local_ops.pop();
         }
         s = pthread_mutex_unlock(&mtx);
@@ -438,7 +444,7 @@ void tryOpen() {
     }
 }
 
-const op_t* queuedOp(int enqueue, op_t *op) {
+const op_t* _queuedOp(int enqueue, op_t *op) {
     if (pos_to_transform == NULL) {
         return NULL;
     }
@@ -460,6 +466,14 @@ const op_t* queuedOp(int enqueue, op_t *op) {
     return NULL;
 }
 
+const op_t* queuedOp(int enqueue, op_t *op) {
+    static pthread_mutex_t que_mtx = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&que_mtx);
+    const op_t* ret = _queuedOp(enqueue, op);
+    pthread_mutex_unlock(&que_mtx);
+    return ret;
+}
+
 static void sigHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         exit(EXIT_SUCCESS);
@@ -468,6 +482,8 @@ static void sigHandler(int sig) {
         endwin();
         removeOutFileAtExit();
         signal(sig, SIG_DFL);
+        // cerr << "Caught deadly signal: Segmentation Fault" << endl;
+        // exit(EXIT_SUCCESS);
     }
 }
 

@@ -234,10 +234,7 @@ int main(int argc, char *argv[]) {
     atexit(logExitInfo);
 
     /* authenticate */
-    if (readn(STDIN_FILENO, &auth, sizeof(auth)) != sizeof(auth)) {
-        exit(EXIT_FAILURE);
-    }
-    else {
+    if (readn(STDIN_FILENO, &auth, sizeof(auth)) == sizeof(auth)) {
         if (auth.id >= NR_LIBS) {
             exit(EXIT_FAILURE);
         }
@@ -246,12 +243,14 @@ int main(int argc, char *argv[]) {
             syslog(LOG_ERR, "Error load dll: %s", err);
             exit(EXIT_FAILURE);
         }
-        syslog(LOG_INFO , "Using algorithm lib: %s", libs[auth.id]);
+        syslog(LOG_INFO , "Using algorithm lib: %s", ALGO_VER);
         auth.md5sum[MD5SUM_SIZE] = 0;
         if (strlen(auth.md5sum) != MD5SUM_SIZE) {
             /* length must match */
             exit(EXIT_FAILURE);
         }
+        filename += ALGO_VER;
+        filename += "-";
         filename += auth.md5sum;
         auth.id = login();
         atexit(logout);
@@ -260,6 +259,9 @@ int main(int argc, char *argv[]) {
             != sizeof(auth)) {
             exit(EXIT_FAILURE);
         }
+    }
+    else {
+        exit(EXIT_FAILURE); 
     }
     /* set sighup handler */
     sigset_t block_set, prev_mask;

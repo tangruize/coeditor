@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:t:T:a:pwdl")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:T:a:pwdls")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
@@ -43,6 +43,9 @@ int main(int argc, char *argv[]) {
                     program_id = 1;
                 else if (strcmp(optarg, "css") == 0)
                     program_id = 2;
+                break;
+            case 's':
+                can_sim = 1;
                 break;
             default:
                 cerr << "Invalid arguments" << endl;

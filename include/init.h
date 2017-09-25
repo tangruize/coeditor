@@ -29,6 +29,7 @@ extern bool remove_fifo_ot;
 extern bool no_debug;
 extern textOp *edit_file;
 extern user_id_t program_id;
+extern int can_sim;
 
 void removeOutFileAtExit();
 void setOutFilenames();

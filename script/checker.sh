@@ -2,7 +2,7 @@
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
-TEMP=`getopt -o c:t:T:n:wp -n $0 -- "$@"`
+TEMP=`getopt -o c:t:T:n:a:swp -n $0 -- "$@"`
 if [ $? != 0 ]; then echo "Terminating..." >&2; exit 1; fi
 eval set -- "$TEMP"
 
@@ -18,8 +18,10 @@ while true; do
         -t) SLEEP_TIME="-t $2"; shift 2;;
         -T) RECV_TIME="-T $2"; shift 2;;
         -n) GEN_NUM="$2"; shift 2;;
+        -a) COEDITOR_ARGS="$COEDITOR_ARGS -a $2 "; shift 2;;
         -w) COEDITOR_ARGS="$COEDITOR_ARGS -w "; shift;;
         -p) COEDITOR_ARGS="$COEDITOR_ARGS -p "; shift;;
+        -s) COEDITOR_ARGS="$COEDITOR_ARGS -s "; shift;;
         --) shift; break;;
         *)  echo "Internal error!" >&2; exit 1;;
     esac

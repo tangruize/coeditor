@@ -3,7 +3,7 @@
 const char *ALGO_VER = "CSCW";
 
 static unsigned local, global;
-static list<trans_t> outgoing;
+static deque<trans_t> outgoing;
 
 static void Generate(const op_t &op) {
     trans_t msg;
@@ -17,14 +17,14 @@ static void Generate(const op_t &op) {
 
 static void Receive(trans_t msg) {
     /* Discard acknowledged messages. */
-    list<trans_t>::iterator m = outgoing.begin();
-    for (; m != outgoing.end(); ++m)
-        if (m->state >= msg.state) break;
-    outgoing.erase(outgoing.begin(), m);
+    int i;
+    for (i = 0; i < outgoing.size(); ++i)
+        if (outgoing[i].state >= msg.state) break;
+    for (int j = 0; j < i; ++j) outgoing.pop_front();
 
     /* Transform new message and the ones in the queue. */
-    for (m = outgoing.begin(); m != outgoing.end(); ++m)
-        if (xform(msg.op, (*m).op) != 0) break;
+    for (i = 0; i < outgoing.size(); ++i)
+        if (xform(msg.op, outgoing[i].op) != 0) break;
     writeLocal(msg.op);
     ++global;
 }
