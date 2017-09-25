@@ -1,4 +1,8 @@
 *.o
 *.a
 *.d
+*.so
 tags
+jupiter-server
+op-generator
+coeditor
