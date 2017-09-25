@@ -378,8 +378,10 @@ void *writeOp_Thread(void *args) {
     return NULL;
 }
 
+volatile int can_start = 0;
 void *readServer_Thread(void *args) {
     pthread_detach(pthread_self());
+    while (can_start == 0);
     trans_t t;
     ssize_t num_read;
     if (sleep_before_recv == 0.0) {
@@ -490,7 +492,6 @@ void init() {
     saveDirFds();
     setOutFilenames();
     initTimer();
-    redirectStderr();
     if (atexit(removeOutFileAtExit) != 0) {
         cerr << "Cannot set exit function\n";
     }
@@ -577,7 +578,9 @@ void init() {
     else {
         write_op_pos = 1;
     }
+    redirectStderr();
     edit_file->loadFile(edit_file->getFilename());
+    can_start = 1;
     //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
     //PROMPT_ERROR(msg);
 }

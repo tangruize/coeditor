@@ -77,12 +77,13 @@ for i in ${EDIT_NAME[@]}; do
     k=$((k+1))
 done
 
+trap "kill -INT ${PIDS[*]} $SERVER_PID &>/dev/null;trap "" 2 15;kill -- -$$ &> /dev/null" 2 15
+
 read -p "Ready? " ok
 for i in ${PIDS[@]}; do
     CLI_FILE=$(ls ${PREFIX}*${i}*.cli)
     ${EXE_DIR}/op-generator $GEN_NUM > $CLI_FILE &
 done
 
-trap "kill -INT ${PIDS[*]} $SERVER_PID &>/dev/null;trap "" 2 15;kill -- -$$ &> /dev/null" 2 15
-
+cat
 wait

@@ -1,3 +1,5 @@
+#ifndef _DLL_H
+#define _DLL_H
 #include <dlfcn.h>
 #include <stdlib.h>
 
@@ -37,3 +39,5 @@ static inline const char *setDllFuncs(int is_client, int no) {
     ALGO_VER = *version;
     return NULL;
 }
+
+#endif

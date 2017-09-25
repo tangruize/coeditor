@@ -1,6 +1,8 @@
 /* WARNING: declarations in this file should not be called */
 /* why extern "C": Because of C++ name mangling */
 
+#ifndef _DATA_TRANS_H
+#define _DATA_TRANS_H
 #include "common.h"
 #include "op.h"
 #include "xform.h"
@@ -33,3 +35,5 @@ extern "C" void writeLocal(const op_t &op);
 
 /* write a message to the other end */
 extern "C" void writeRemote(const trans_t &msg);
+
+#endif
