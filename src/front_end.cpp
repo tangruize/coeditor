@@ -21,7 +21,6 @@
 using namespace std;
 
 volatile int buf_changed = 0;
-volatile int ot_status = -1;
 int write_op = 1;
 int write_op_pos = 0;
 int no_cli = 1;
@@ -40,7 +39,6 @@ static void *fifoInputCli_thread(void *arg) {
 }
 
 void frontEnd(textOp &file) {
-    redirectStderr();
     if (!no_cli && creatCliInputFifo() == 0) {
         pthread_t t1;
         pthread_create(&t1, NULL, fifoInputCli_thread, &file);

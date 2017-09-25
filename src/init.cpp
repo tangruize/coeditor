@@ -53,7 +53,7 @@ int socket_fd = -1;
 queue<trans_t> to_send;
 queue<trans_t> to_recv;
 
-user_id_t program_id;
+user_id_t program_id = -1;
 queue<op_t> *pos_to_transform;
 
 /* timer for receive event */
@@ -490,12 +490,25 @@ void init() {
     saveDirFds();
     setOutFilenames();
     initTimer();
+    redirectStderr();
     if (atexit(removeOutFileAtExit) != 0) {
         cerr << "Cannot set exit function\n";
     }
     pos_to_transform = new queue<op_t>;
     if (server_addr.size()) {
-        const char *err = setDllFuncs(1);
+        const char *err = NULL;
+        if (program_id < 0) {
+            for (program_id = 0; program_id < NR_LIBS; ++program_id) {
+                if ((err = setDllFuncs(1, program_id)) == NULL)
+                    break;
+            }
+        }
+        else if (program_id < NR_LIBS) {
+            err = setDllFuncs(1, program_id);
+        }
+        else {
+            err = "Error: cannot find algorithm lib";
+        }
         if (err != NULL) {
             cerr << "Error: " << err << endl;
             exit(EXIT_FAILURE);
@@ -511,13 +524,13 @@ void init() {
             exit(EXIT_FAILURE);
         }
         auth_t auth = {
-            0, "d41d8cd98f00b204e9800998ecf8427e"
+            program_id, "d41d8cd98f00b204e9800998ecf8427e"
         };
         if (edit_file->getFilename().size()
             && access(edit_file->getFilename().c_str(), R_OK) == 0)
         {
-            cerr << "Calculating '" << edit_file->getFilename()
-                 << "' md5sum..." << endl;
+            // cerr << "Calculating '" << edit_file->getFilename()
+            //      << "' md5sum..." << endl;
             string md5sum_file = "/tmp/" + out_file_prefix + "md5sum";
             string cmd = "md5sum " + edit_file->getFilename() + " >"
                          + md5sum_file;
@@ -537,7 +550,7 @@ void init() {
             }
             close(md5_fd);
         }
-        cerr << "Connecting " << server_addr << " ..." << endl;
+        // cerr << "Connecting " << server_addr << " ..." << endl;
         if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
             || read(socket_fd, &auth, sizeof(auth)) <=0)
         {

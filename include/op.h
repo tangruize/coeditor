@@ -60,7 +60,7 @@ struct auth_t {
  * same ID login, server_id used to signal new coming operations
  */
 struct file_id_t {
-    user_id_t client_id;
+    //user_id_t client_id;
     pid_t server_id;
 }__attribute__((packed));
 
@@ -70,7 +70,7 @@ struct file_id_t {
  *  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * | 4 byte, current online users                                      |
  *  -------------------------------------------------------------------
- * | USER_MAX * sizeof(file_id_t) bytes, space for user id & server id |
+ * | USER_MAX * sizeof(file_id_t) bytes, space for id                  |
  *  -------------------------------------------------------------------
  * | operation sequences, sizeof(trans_t) * n ...                      |
  *  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

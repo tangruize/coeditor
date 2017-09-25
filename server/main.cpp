@@ -102,7 +102,7 @@ int login() {
         exit(EXIT_FAILURE);
     }
     file_id_t fi, tmp;
-    fi.client_id = auth.id;
+    //fi.client_id = auth.id;
     fi.server_id = prog_id;
     int i = 0;
     for (; i < USER_MAX; ++i) {
@@ -129,7 +129,7 @@ int login() {
         /* no seat available, should not happen */
         exit(EXIT_FAILURE);
     }
-    fi.client_id = i;
+    //fi.client_id = i + 1;
     /* take the seat */
     pwrite(readfd, &fi, sizeof(fi), sizeof(n) + sizeof(fi) * i);
     ++n;
@@ -137,7 +137,7 @@ int login() {
     releaseFileLock();
     /* op start offset */
     lseek(readfd, SHM_OFFSET, SEEK_SET);
-    return i;
+    return (int)getpid();
 }
 
 void logout() {
@@ -232,16 +232,21 @@ int main(int argc, char *argv[]) {
     memset(&data, 0, sizeof(trans_t));
     syslog(LOG_INFO , "Jupiter server started [PID %ld]", (long)prog_id);
     atexit(logExitInfo);
-    const char *err = setDllFuncs(0);
-    if (err != NULL) {
-        syslog(LOG_ERR, "Error load dll: %s", err);
-        exit(EXIT_FAILURE);
-    }
+
     /* authenticate */
     if (readn(STDIN_FILENO, &auth, sizeof(auth)) != sizeof(auth)) {
         exit(EXIT_FAILURE);
     }
     else {
+        if (auth.id >= NR_LIBS) {
+            exit(EXIT_FAILURE);
+        }
+        const char *err = setDllFuncs(0, auth.id);
+        if (err != NULL) {
+            syslog(LOG_ERR, "Error load dll: %s", err);
+            exit(EXIT_FAILURE);
+        }
+        syslog(LOG_INFO , "Using algorithm lib: %s", libs[auth.id]);
         auth.md5sum[MD5SUM_SIZE] = 0;
         if (strlen(auth.md5sum) != MD5SUM_SIZE) {
             /* length must match */
@@ -256,8 +261,6 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
-    /* newcomer can get all history operations immediately */
-    writeClient(SIGHUP);
     /* set sighup handler */
     sigset_t block_set, prev_mask;
     sigemptyset(&block_set);
@@ -272,10 +275,13 @@ int main(int argc, char *argv[]) {
     /* sigint and sigterm handler */
     sa.sa_handler = sigExitHandler;
     if (sigaction(SIGINT, &sa, NULL) == -1
-        || sigaction(SIGTERM, &sa, NULL) == -1)
+        || sigaction(SIGTERM, &sa, NULL) == -1
+        || sigaction(SIGPIPE, &sa, NULL) == -1)
     {
         exit(EXIT_FAILURE);
     }
+    /* newcomer can get all history operations immediately */
+    writeClient(SIGHUP);
     /* read local op, readn promises reading sizeof(trans_t) bytes data */
     while ((num_read = readn(STDIN_FILENO, &data, sizeof(trans_t))) > 0) {
         getFileLock();

@@ -320,7 +320,6 @@ textOp::insertChar(pos_t pos, char c, uint64_t *off, int *flags) {
         }
     }
     assert(cerr << "---before ins: " << it->line << endl);
-    ++total_chars;
     if (c == '\n') {
         if (pos.offset == 0) {
             linestruct pre_blank_line;
@@ -349,6 +348,7 @@ textOp::insertChar(pos_t pos, char c, uint64_t *off, int *flags) {
         it->line.insert(pos.offset - 1, tmpbuf);
     }
     modified = true;
+    ++total_chars;
     assert(cerr << "---after  ins: " << it->line << endl);
     assert(cerr << "---lineno: " << cur_line_no << "/"
                 << edit_file.size() << ", char: "

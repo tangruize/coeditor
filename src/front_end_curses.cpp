@@ -1769,22 +1769,6 @@ int calPos() {
     return need_redraw;
 }
 
-void showOTexited(int status) {
-    string msg = "OT ";
-    if (WIFEXITED(status)) {
-        msg += "exited, status=" + to_string(WEXITSTATUS(status));
-    }
-    else if (WIFSIGNALED(status)) {
-        msg += "killed by signal " + to_string(WTERMSIG(status)) + " ("
-               + string(strsignal(WTERMSIG(status))) + ")";
-    }
-    else {
-        msg += "exited";
-    }
-    status_t tmp = { msg.c_str() };
-    redraw(RD_STMSG | SM_IMMEDIATE, &tmp);
-}
-
 /* control center */
 void control() {
     int ch;
@@ -1861,10 +1845,6 @@ void control() {
             else if (ret & NEED_REDRAW_LINE) {
                 redrawCurLine();
             }
-        }
-        if (ot_status != -1) {
-            showOTexited(ot_status);
-            ot_status = -1;
         }
         if (ch == ERR) {
             continue;

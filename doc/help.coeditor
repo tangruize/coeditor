@@ -50,8 +50,9 @@ Coeditor command line arguments
  Coeditor supports 10 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
--t sec(float)            deliver to OT (delay time before sending)
--T sec(float)            deliver to OT (delay time before receiving)
+-t sec(float)            Delay time before sending
+-T sec(float)            Delay time before receiving
+-a cscw/css              Specify an algorithm (default cscw)
 -w                       CLI not to write OP ouput pipe (default write)
 -p                       OP ouput using (row, col) (default file offset)
 -l                       Start CLI thread (default not)

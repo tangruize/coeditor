@@ -10,15 +10,11 @@ static const char *libs[] = {
 };
 #define NR_LIBS (sizeof(libs) / sizeof(libs[0]))
 
-static inline const char *setDllFuncs(int is_client) {
+static inline const char *setDllFuncs(int is_client, int no) {
     void *libHandle;
     const char *err;
-    int i;
-    for (i = 0; i < NR_LIBS; ++i)
-        if ((libHandle = dlopen(libs[i], RTLD_LAZY)) != NULL)
-            break;
-    if (libHandle == NULL)
-        return "dlopen: no lib found";
+    if ((libHandle = dlopen(libs[no], RTLD_LAZY)) == NULL)
+        return dlerror();
     dlerror();
     const char **version;
     version = (const char **)dlsym(libHandle, "ALGO_VER");
@@ -30,10 +26,14 @@ static inline const char *setDllFuncs(int is_client) {
         *(void **)(&fromLocal) = dlsym(libHandle, "procRemote");
         *(void **)(&fromNet) = dlsym(libHandle, "procClient");
     }
-    if ((err = dlerror()) != NULL)
+    if ((err = dlerror()) != NULL) {
+        dlclose(libHandle);
         return err;
-    if (fromLocal == NULL || fromNet == NULL || version == NULL)
+    }
+    if (fromLocal == NULL || fromNet == NULL || version == NULL) {
+        dlclose(libHandle);
         return "algorithm function is NULL";
+    }
     ALGO_VER = *version;
     return NULL;
 }
