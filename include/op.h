@@ -56,26 +56,4 @@ struct auth_t {
     char md5sum[MD5SUM_SIZE + 1];
 }__attribute__((packed));
 
-/* record (client_id, server_id) pair, client_id is used to prevent 
- * same ID login, server_id used to signal new coming operations
- */
-struct file_id_t {
-    //user_id_t client_id;
-    pid_t server_id;
-}__attribute__((packed));
-
-/* server operation file format
- * file name: jupiter-server-[MD5]
- * file content:
- *  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * | 4 byte, current online users                                      |
- *  -------------------------------------------------------------------
- * | USER_MAX * sizeof(file_id_t) bytes, space for id                  |
- *  -------------------------------------------------------------------
- * | operation sequences, sizeof(trans_t) * n ...                      |
- *  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- */
-#define USER_MAX 32
-#define SHM_OFFSET (sizeof(int) + USER_MAX * sizeof(file_id_t))
-
 #endif

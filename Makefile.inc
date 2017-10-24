@@ -1,15 +1,14 @@
 INC_DIR = ../include
 CXXFLAGS += -std=c++11 \
-		-g -I${INC_DIR} \
+		-g -O2 -I${INC_DIR} \
 		-pedantic \
 		-Wall \
 		-Wextra \
 		-Wno-sign-compare \
+		-Wno-unused-result \
 		-Wno-unused-parameter -DNDEBUG
 
-ifndef EXE
-EXE = dummy
-endif
+EXE ?= dummy
 
 RM = rm -f
 

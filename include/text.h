@@ -76,9 +76,9 @@ public:
     }
 
     /* meaningless in base class */
-    virtual bool isLocked() const {
-        return false;
-    }
+    // virtual bool isLocked() const {
+    //     return false;
+    // }
 
     /* get file name */
     string getFilename() const {

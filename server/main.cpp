@@ -1,9 +1,9 @@
 /*************************************************************************
-	> File Name: multi_client_server.cpp
-	> Author: Tang Ruize
-	> Mail: 151220100@smail.nju.edu.cn
-	> Creation Time: 2017-08-01 11:28
-	> Description: 
+    > File Name: multi_client_server.cpp
+    > Author: Tang Ruize
+    > Mail: 151220100@smail.nju.edu.cn
+    > Creation Time: 2017-08-01 11:28
+    > Description: 
  ************************************************************************/
 
 #include "op.h"
@@ -23,20 +23,30 @@
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
+#include <semaphore.h>
+#include <poll.h>
+#include <sys/inotify.h>
 #include <sys/file.h>
 #include <sys/types.h>
 
-//#define DEBUG
+#define INFO(MSG) syslog(LOG_INFO, "(%d) " #MSG, getpid())
+#define ERROR(MSG) \
+do { \
+    syslog(LOG_ERR, "(%d) " #MSG ": %s", getpid(), strerror(errno)); \
+    exit(EXIT_FAILURE); \
+} while (0)
 
-string filename = "/tmp/jupiter-server-";
+// inotify buf
+#define BUF_LEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
+char buf[BUF_LEN];
+
+string filename = "jupiter-server-";
+string semname = "/";
 auth_t auth;
-pid_t prog_id;
-int readfd = -1, writefd = -1;
-unsigned local, global;
-list<trans_t> outgoing;
+int readfd = -1, writefd = -1, inotifyfd = -1;
+sem_t *sem; /* online users number */
 
-int xform(op_t &op, op_t &outop);
-
+// prevent other servers writing at the same time
 void getFileLock() {
     flock(readfd, LOCK_EX);
 }
@@ -45,260 +55,186 @@ void releaseFileLock() {
     flock(readfd, LOCK_UN);
 }
 
-int login() {
-    static int retry_times = 1;
-    readfd = open(filename.c_str(), O_RDWR);
-    if (readfd == -1) {
-        /* file probably not created */
-        if (errno != ENOENT) {
-            /* other failure */
-            exit(EXIT_FAILURE);
-        }
-        /* file does not exist, create it exclusively */
-        readfd = open(filename.c_str(), O_RDWR | O_EXCL | O_CREAT, 0600);
-        if (readfd == -1) {
-            if (errno == EEXIST) {
-                /* file exists, race condition */
-                if (retry_times) {
-                    --retry_times;
-                    return login();
-                }
-                else {
-                    /* should not happen */
-                    exit(EXIT_FAILURE);
-                }
-            }
-            else {
-                /* other failure */
-                exit(EXIT_FAILURE);
-            }
-        }
-        /* file is surely created by us, truncate file */
-        if (ftruncate(readfd, 0) == -1) {
-            exit(EXIT_FAILURE);
-        }
-        if (ftruncate(readfd, SHM_OFFSET) == -1) {
-            exit(EXIT_FAILURE);
-        }
-    }
-    writefd = open(filename.c_str(), O_WRONLY | O_APPEND);
-    if (writefd == -1) {
-        exit(EXIT_FAILURE);
-    }
-    /* ensure file is writed by one process at a time */
-    getFileLock();
-    int n = 0;
-    if (read(readfd, &n, sizeof(n)) == 0 || n == 0) {
-        /* race condition: file created but may not truncated */
-        if (ftruncate(readfd, 0) == -1) {
-            exit(EXIT_FAILURE);
-        }
-        if (ftruncate(readfd, SHM_OFFSET) == -1) {
-            exit(EXIT_FAILURE);
-        }
-    }
-    if (n == USER_MAX) {
-        /* reached user limit */
-        exit(EXIT_FAILURE);
-    }
-    file_id_t fi, tmp;
-    //fi.client_id = auth.id;
-    fi.server_id = prog_id;
-    int i = 0;
-    for (; i < USER_MAX; ++i) {
-        if (read(readfd, &tmp, sizeof(tmp)) != sizeof(tmp)) {
-            exit(EXIT_FAILURE);
-        }
-        /*if (tmp.client_id == fi.client_id) {
-            exit(EXIT_FAILURE);
-        }*/
-        if (tmp.server_id == 0) {
-            /* get the seat */
-            break;
-        }
-    }
-    /*for (int j = i + 1; j < USER_MAX; ++j) {
-        if (read(readfd, &tmp, sizeof(tmp)) != sizeof(tmp)) {
-            exit(EXIT_FAILURE);
-        }
-        if (tmp.client_id == fi.client_id) {
-            exit(EXIT_FAILURE);
-        }   
-    }*/
-    if (i == USER_MAX) {
-        /* no seat available, should not happen */
-        exit(EXIT_FAILURE);
-    }
-    //fi.client_id = i + 1;
-    /* take the seat */
-    pwrite(readfd, &fi, sizeof(fi), sizeof(n) + sizeof(fi) * i);
-    ++n;
-    pwrite(readfd, &n, sizeof(n), 0);
-    releaseFileLock();
-    /* op start offset */
-    lseek(readfd, SHM_OFFSET, SEEK_SET);
-    return (int)getpid();
-}
-
-void logout() {
-    /* _exit() in this function should not be called */
-    lseek(readfd, 0, SEEK_SET);
-    getFileLock();
-    int n = 0;
-    read(readfd, &n, sizeof(n));
-    --n;
-    if (n < 0) {
-        _exit(EXIT_FAILURE);
-    }
-    file_id_t tmp;
-    int i = 0;
-    for (; i < USER_MAX; ++i) {
-        if (read(readfd, &tmp, sizeof(tmp)) != sizeof(tmp)) {
-            _exit(EXIT_FAILURE);
-        }
-        if (tmp.server_id == prog_id) {
-            /* I am here */
-            break;
-        }
-    }
-    if (i == USER_MAX) {
-        /* where am I? */
-        _exit(EXIT_FAILURE);
-    }
-    /* clear the seat */
-    memset(&tmp, 0, sizeof(tmp));
-    pwrite(readfd, &tmp, sizeof(tmp), sizeof(n) + sizeof(tmp) * i);
-    pwrite(readfd, &n, sizeof(n), 0);
-    releaseFileLock();
-}
-
+// log an exit information
 void logExitInfo() {
-    syslog(LOG_INFO , "Jupiter server exiting [PID %ld]", (long)prog_id);
+    INFO(exit);
 }
 
+// remove sem if no online user
+void logout() {
+    int sval;
+    sem_getvalue(sem, &sval);
+    syslog(LOG_INFO, "(%d) exiting, user id: %d, current online: %d", getpid(), auth.id, sval - 1);
+    if (sem_trywait(sem) == -1 || sval == 1) {
+        sem_unlink(semname.c_str());
+        INFO(sem_unlink);
+    }
+}
+
+// open files, get user id and increase online users
+int login() {
+    readfd = open(filename.c_str(), O_RDWR | O_CREAT | O_EXCL, 0600);
+    if (readfd != -1) {
+        sem_unlink(semname.c_str());
+        INFO(try sem_unlink);
+    }
+    else if (errno == EEXIST)
+        readfd = open(filename.c_str(), O_RDWR);
+    if (readfd == -1)
+        ERROR(open buf);
+    writefd = open(filename.c_str(), O_WRONLY | O_APPEND);
+    if (readfd == -1 || writefd == -1)
+        ERROR(open);
+    sem = sem_open(semname.c_str(), O_CREAT | O_EXCL, 0600, 0);
+    if (sem == SEM_FAILED) {
+        if (errno == EEXIST)
+            sem = sem_open(semname.c_str(), 0);
+        if (sem == SEM_FAILED)
+            ERROR(sem_open);
+    }
+    else {
+        if (ftruncate(readfd, 0) == -1)
+            ERROR(ftruncate);
+        if (ftruncate(readfd, sizeof(user_id_t)) == -1)
+            ERROR(ftruncate);
+    }
+    if (sem_post(sem) == -1)
+        ERROR(sem_post);
+    getFileLock();
+    user_id_t id;
+    if (read(readfd, &id, sizeof(user_id_t)) != sizeof(user_id_t))
+        ERROR(read num);
+    ++id;
+    if (pwrite(readfd, &id, sizeof(user_id_t), 0) != sizeof(user_id_t))
+        ERROR(write num);
+    releaseFileLock();
+    atexit(logout);
+    return id;
+}
+
+// load algo lib and set user id
+void authenticate() {
+    if (readn(STDIN_FILENO, &auth, sizeof(auth)) != sizeof(auth))
+        ERROR(authenticate);
+    if (auth.id >= NR_LIBS)
+        ERROR(load lib);
+    const char *err = setDllFuncs(0, auth.id);
+    if (err != NULL) {
+        syslog(LOG_ERR, "(%d) %s", getpid(), err);
+        exit(EXIT_FAILURE);
+    }
+    syslog(LOG_INFO, "(%d) algorithm: %s", getpid(), ALGO_VER);
+    auth.md5sum[MD5SUM_SIZE] = 0;
+    if (strlen(auth.md5sum) != MD5SUM_SIZE) {
+        syslog(LOG_ERR, "(%d) MD5 format error", getpid());
+        exit(EXIT_FAILURE);
+    }
+    string tmp = filename;
+    tmp += string(ALGO_VER) + string("-") + string(auth.md5sum);
+    semname += tmp;
+    filename = string("/tmp/") + tmp;
+    auth.id = login();
+    if (write(STDOUT_FILENO, &auth, sizeof(auth)) != sizeof(auth))
+        ERROR(ack);
+    int sval;
+    sem_getvalue(sem, &sval);
+    syslog(LOG_INFO, "(%d) user id: %d, current online: %d", getpid(), auth.id, sval);
+}
+
+// init monitering file changes
+void initInotify() {
+    if ((inotifyfd = inotify_init()) == -1)
+        ERROR(inotify_init);
+    if (inotify_add_watch(inotifyfd, filename.c_str(), IN_MODIFY) == -1)
+        ERROR(inotify_add_watch);
+}
+
+// if there are any changes, send them to its client
+void localProcess() {
+    op_t op;
+    ssize_t num_read;
+    while ((num_read = read(readfd, &op, sizeof(op_t))) == sizeof(op_t))
+        if (op.id != auth.id)
+            (*fromLocal)(op);
+    if (num_read != 0) {
+        if (num_read == -1)
+            syslog(LOG_ERR, "(%d) read: %s", getpid(), strerror(errno));
+        else
+            lseek(readfd, -num_read, SEEK_CUR);
+    }
+}
+
+// receive msgs from its client
+void remoteProcess() {
+    trans_t data;
+    ssize_t num_read;
+    if ((num_read = readn(STDIN_FILENO, &data, sizeof(trans_t))) != sizeof(trans_t)) {
+        if (num_read == 0)
+            exit(EXIT_SUCCESS);
+        ERROR(read client);
+    }
+    getFileLock();
+    localProcess();
+    (*fromNet)(data);
+    releaseFileLock();        
+}
+
+// moniter local and remote
+void startMonitor() {
+    struct pollfd fds[2] = {
+        {inotifyfd, POLLIN, 0},
+        {STDIN_FILENO, POLLIN, 0},
+    };
+    while (poll(fds, 2, -1) != -1) {
+        if (fds[0].revents & POLLIN) {
+            if (read(inotifyfd, buf, BUF_LEN) <= 0)
+                ERROR(read inotifyfd);
+            localProcess();
+        }
+        else if (fds[1].revents & POLLIN)
+            remoteProcess();
+        else if (fds[1].revents & POLLHUP)
+            exit(EXIT_SUCCESS);
+    }
+    ERROR(poll);
+}
+
+// call-back function used by algo (local processing)
 void writeLocal(const op_t &op) {
     write(writefd, &op, sizeof(op));
 }
 
+// call-back function used by algo (remote processing)
 void writeRemote(const trans_t &msg) {
     write(STDOUT_FILENO, &msg, sizeof(msg));
 }
 
-/* send signal to any other servers */
-void notifyOtherServers() {
-    file_id_t fi;
-    int n;
-    pread(readfd, &n, sizeof(n), 0);
-    --n;
-    for (int i = 0; i < USER_MAX && n; ++i) {
-        pread(readfd, &fi, sizeof(fi), sizeof(int) + sizeof(fi) * i);
-        if (fi.server_id != prog_id && fi.server_id != 0) {
-            kill(fi.server_id, SIGHUP);
-            --n;
-        }
-    }
-}
-
-void writeClient(int sig) {
-    trans_t t;
-    ssize_t num_read;
-    while ((num_read = read(readfd, &t.op, sizeof(op_t)))
-           == sizeof(op_t))
-    {
-        if (t.op.id != auth.id) {
-            (*fromLocal)(t.op);
-        }
-    }
-    if (num_read != 0) {
-        if (num_read == -1) {
-            syslog(LOG_ERR, "read op file: %s", strerror(errno));
-        }
-        else {
-            /* race condition: read partial data, "put back" */
-            lseek(readfd, -num_read, SEEK_CUR);
-        }
-    }
-}
-
+// exit if signaled. before exiting, print exiting and logout
 void sigExitHandler(int sig) {
-    /* call exit() so that we can logout properly */
+    INFO(signaled);
     exit(EXIT_SUCCESS);
 }
 
-int main(int argc, char *argv[]) {
-    trans_t data;
-    ssize_t num_read;
-    prog_id = getpid();
-    memset(&data, 0, sizeof(trans_t));
-    syslog(LOG_INFO , "Jupiter server started [PID %ld]", (long)prog_id);
-    atexit(logExitInfo);
-
-    /* authenticate */
-    if (readn(STDIN_FILENO, &auth, sizeof(auth)) == sizeof(auth)) {
-        if (auth.id >= NR_LIBS) {
-            exit(EXIT_FAILURE);
-        }
-        const char *err = setDllFuncs(0, auth.id);
-        if (err != NULL) {
-            syslog(LOG_ERR, "Error load dll: %s", err);
-            exit(EXIT_FAILURE);
-        }
-        syslog(LOG_INFO , "Using algorithm lib: %s", ALGO_VER);
-        auth.md5sum[MD5SUM_SIZE] = 0;
-        if (strlen(auth.md5sum) != MD5SUM_SIZE) {
-            /* length must match */
-            exit(EXIT_FAILURE);
-        }
-        filename += ALGO_VER;
-        filename += "-";
-        filename += auth.md5sum;
-        auth.id = login();
-        atexit(logout);
-        /* ack */
-        if (write(STDOUT_FILENO, &auth, sizeof(auth))
-            != sizeof(auth)) {
-            exit(EXIT_FAILURE);
-        }
-    }
-    else {
-        exit(EXIT_FAILURE); 
-    }
-    /* set sighup handler */
-    sigset_t block_set, prev_mask;
-    sigemptyset(&block_set);
-    sigaddset(&block_set, SIGHUP);
+// add signals
+void initSignal() {
     struct sigaction sa;
-    sa.sa_handler = writeClient;
-    sa.sa_flags = SA_RESTART;
     sigemptyset(&sa.sa_mask);
-    if (sigaction(SIGHUP, &sa, NULL) == -1) {
-        exit(EXIT_FAILURE);
-    }
-    /* sigint and sigterm handler */
     sa.sa_handler = sigExitHandler;
     if (sigaction(SIGINT, &sa, NULL) == -1
         || sigaction(SIGTERM, &sa, NULL) == -1
         || sigaction(SIGPIPE, &sa, NULL) == -1)
     {
-        exit(EXIT_FAILURE);
+        ERROR(sigaction);
     }
-    /* newcomer can get all history operations immediately */
-    writeClient(SIGHUP);
-    /* read local op, readn promises reading sizeof(trans_t) bytes data */
-    while ((num_read = readn(STDIN_FILENO, &data, sizeof(trans_t))) > 0) {
-        getFileLock();
-        /* block sighup while writing (become deaf temporarily) */
-        sigprocmask(SIG_BLOCK, &block_set, &prev_mask);
-        (*fromNet)(data);
-        /* wake up other servers */
-        notifyOtherServers();
-        /* restore pre sigmask */
-        sigprocmask(SIG_SETMASK, &prev_mask, NULL);
-        releaseFileLock();
-    }
-    if (num_read == -1) {
-        syslog(LOG_ERR, "Error from read(): %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+}
+
+int main(int argc, char *argv[]) {
+    INFO(start);
+    atexit(logExitInfo);
+    initSignal();
+    authenticate();
+    initInotify();
+    localProcess(); /* read out all history msgs */
+    startMonitor();
     exit(EXIT_SUCCESS);
 }

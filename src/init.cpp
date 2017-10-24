@@ -287,9 +287,9 @@ void *sendTimer_Thread(void *args) {
     return NULL;
 }
 
-void procServerWrapper(const trans_t &t) {
+void __attribute__((optimize("O0"))) procServerWrapper(const trans_t &t) {
     edit_file->lock();
-    while (local_ops.size());
+    while (!local_ops.empty()); // compiler thinks it is an infinite loop!!!
     if (can_sim == 0) pthread_mutex_lock(&algo_mtx);
     (*fromNet)(t);
     if (can_sim == 0) pthread_mutex_unlock(&algo_mtx);
@@ -369,7 +369,7 @@ void *writeOp_Thread(void *args) {
             }
         }
         /* Consume all available units */
-        while (local_ops.size()) {
+        while (!local_ops.empty()) {
             const op_t &op = local_ops.front();
             if (can_sim == 0) pthread_mutex_lock(&algo_mtx);
             (*fromLocal)(op);

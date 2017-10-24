@@ -20,7 +20,7 @@ public:
     textOpMutex(const string &filename = "") {
         pthread_mutex_init(&mtx, NULL);
         pthread_mutex_init(&mtx2, NULL);
-        locked = false;
+        // locked = false;
     }
 
     virtual ~textOpMutex() {
@@ -55,22 +55,22 @@ public:
 
     /* lock buf to prevent from editing */
     virtual void lock() {
-        if (!locked) {
-            locked = true;
-            pthread_mutex_lock(&mtx2);
-        }
+        // if (!locked) {
+            // locked = true;
+        pthread_mutex_lock(&mtx2);
+        // }
     }
 
     virtual void unlock() {
-        if (locked) {
-            pthread_mutex_unlock(&mtx2);
-            locked = false;
-        }
+        // if (locked) {
+        pthread_mutex_unlock(&mtx2);
+            // locked = false;
+        // }
     }
 
-    virtual bool isLocked() const {
-        return locked;
-    }
+    // virtual bool isLocked() const {
+    //     return locked;
+    // }
     
 private:
     pthread_mutex_t mtx;

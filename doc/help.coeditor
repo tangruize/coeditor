@@ -82,8 +82,8 @@ CLI command format
 D offset                 Delete character at offset
 I offset char            Insert character at offset
 
-d row col                Delete charater at (row, col)
-i row col char           Insert charater at (row, col)
+d row col                Delete character at (row, col)
+i row col char           Insert character at (row, col)
 
 p [lineno, [n]]          Print n lines from lineno
 s [filename]             Save to filename

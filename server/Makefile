@@ -1,4 +1,4 @@
-LDFLAGS = -ldl -export-dynamic -Wl,-rpath,'$$ORIGIN'/lib
+LDFLAGS = -pthread -ldl -export-dynamic -Wl,-rpath,'$$ORIGIN'/lib
 
 EXE = ../jupiter-server
 
