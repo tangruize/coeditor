@@ -38,14 +38,16 @@ enum {
     CH_DELETE = 'D', CH_INSERT = 'I'
 };
 
+struct state_t {
+    int local;
+    int global;
+};
+
 struct trans_t {
     op_t op;
     union {
         int64_t state;
-        struct {
-            int local;
-            int global;
-        } states;
+        state_t states;
     };
 }__attribute__((packed));
 

@@ -2,7 +2,7 @@ Coeditor help text
 
  The Coeditor is designed to generate edit operation sequences automatically
  and apply operations from OT functions.  There are four main sections of the
- editor.  The top line shows the program version, the current filename being
+ editor.  The top line shows the algorithm version, the current filename being
  edited, and whether or not the file has been modified.  Next is the main
  editor window showing the file being edited.  The status line is the third
  line from the bottom and shows important messages.  The bottom two lines
@@ -114,14 +114,7 @@ Text format
  cannot delete at filesize.
 
 
-Local I/O format
+Local/Server I/O format
 
- A local I/O is 12 bytes in total.  For details, please see 'include/op.h'
- file.  The feedback end will return the same data if it is successfully
- applied, otherwise, the operation field is minus. (if feedback enabled)
-
-
-Server I/O format
-
- A server I/O is 16 byte in total.  For details, please see 'include/op.h'
- file.  The feedback end is the same as Local I/O.
+ A local I/O is 12 bytes while a server I/O is 20 byte.  For details, please
+ see 'include/op.h' file.

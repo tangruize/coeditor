@@ -36,13 +36,14 @@ do { \
     exit(EXIT_FAILURE); \
 } while (0)
 
-// inotify buf
+/* inotify buf * 10. */
 #define BUF_LEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
+/* we don't care the buf contents because there is only one event to monitor */
 char buf[BUF_LEN];
 
-string filename = "jupiter-server-";
-string semname = "/";
-auth_t auth;
+string filename = "jupiter-server-"; /* filename <- "/tmp/" + filename + "CSCW"/"CSS" + MD5 */
+string semname = "/"; /* semname <- semname + filename*/
+auth_t auth; /* first step: algorithm <- auth.id; second step: auth.id <- user id */
 int readfd = -1, writefd = -1, inotifyfd = -1;
 sem_t *sem; /* online users number */
 
