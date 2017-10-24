@@ -116,5 +116,16 @@ Text format
 
 Local/Server I/O format
 
+<<<<<<< HEAD
  A local I/O is 12 bytes while a server I/O is 20 byte.  For details, please
  see 'include/op.h' file.
+=======
+ A local I/O is 12 bytes in total.  For details, please see 'include/op.h'
+ file.
+
+
+Server I/O format
+
+ A server I/O is 20 byte in total.  For details, please see 'include/op.h'
+ file.
+>>>>>>> 9d00d6f8fd01b6d88d5b514212aced55a0fd336b
