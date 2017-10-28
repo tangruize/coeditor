@@ -1546,9 +1546,6 @@ void keyMouse(bool help_state = false) {
             return;
         }
         #endif
-        if (help_state) {
-            return;
-        }
         if (mouse_event.y < TITLE_LINES) {
             preLine();
         }
@@ -1556,6 +1553,9 @@ void keyMouse(bool help_state = false) {
             nextLine();
         }
         else {
+            if (help_state) {
+                return;
+            }
             cur_pos.lineno = mouse_event.y - TITLE_LINES
                              + screen_start_line;
             if (cur_pos.lineno > editing_file->getTotalLines()) {
@@ -1621,7 +1621,7 @@ void getHelp() {
             return;
         }
         string helpfilename = dirname(path_buf);
-        helpfilename += "/doc/help.coeditor";
+        helpfilename += "/doc/coeditor.help";
         if (help_file->loadFile(helpfilename) != NOERR) {
             redraw(RD_STMSG | SM_IMMEDIATE, &not_found);
             delete help_file;
