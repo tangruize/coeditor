@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[]) {
     int opt;
-    while ((opt = getopt(argc, argv, "c:t:T:a:pwdls")) != -1) {
+    while ((opt = getopt(argc, argv, "c:t:T:a:pwdlsS")) != -1) {
         switch (opt) {
             case 'c':
                 server_addr = optarg;
@@ -47,6 +47,9 @@ int main(int argc, char *argv[]) {
             case 's':
                 can_sim = 1;
                 break;
+            case 'S':
+                edit_mode = -1;
+                break;
             default:
                 cerr << "Invalid arguments" << endl;
                 exit(EXIT_FAILURE);
@@ -59,6 +62,12 @@ int main(int argc, char *argv[]) {
 //        auto msg = file.loadFile(argv[optind]);
 //        EXIT_ERROR(msg);
         file.setFilename(argv[optind]);
+    }
+    if (edit_mode == -1) {
+        server_addr.clear();
+        ot_time_arg.clear();
+        ot_recv_time_arg.clear();
+        no_cli = 1;
     }
     init();
     frontEnd(file);

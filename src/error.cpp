@@ -16,8 +16,12 @@ extern char *program_invocation_name;
  * term and lineno are encapsulated by macro, see header
  */
 void _err(prompt_t &errmsg, bool term, int lineno, const char *file) {
+#ifndef NDEBUG
     cerr << program_invocation_name << ":" << file << ":"
          << lineno << ":" << errmsg << endl;
+#else
+    cerr << program_invocation_name << ":" << errmsg << endl;
+#endif
     if (term) {
         exit(EXIT_FAILURE);
     }

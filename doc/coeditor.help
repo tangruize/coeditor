@@ -47,12 +47,13 @@ Coeditor command line arguments
  file existence and permissions.  If file does not exist, Coeditor will create
  it while saving. 
 
- Coeditor supports 9 options up to now:
+ Coeditor supports 10 options up to now:
 
 -c server-address        Establish a connection with Jupiter server
 -t sec(float)            Delay time before sending (default 0)
 -T sec(float)            Delay time before receiving (default 0)
 -a cscw/css              Specify an algorithm (default determined by libalgo)
+-S                       View server replica state
 -s                       Algorithm processes local and server simultaneously
 -w                       CLI not to write OP ouput fifo (default write)
 -p                       OP ouput using (row, col) (default file offset)

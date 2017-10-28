@@ -30,6 +30,8 @@
 #include <pthread.h>
 #include <sys/timerfd.h>
 #include <ncurses.h>
+#include <semaphore.h>
+#include <sys/inotify.h>
 
 #define TRASH_FILE "/dev/null"
 
@@ -40,6 +42,11 @@ string ot_recv_time_arg;
 string server_addr;
 string out_file_prefix_no_pid = OUT_FILE_PREFIX;
 string out_file_prefix;
+
+string jupiter_file, jupiter_sem;
+int jupiter_fd = -1, inotify_fd = -1;
+sem_t *sem;
+
 textOp *edit_file;
 
 bool no_debug = true;
@@ -56,6 +63,10 @@ queue<trans_t> to_recv;
 
 user_id_t program_id = -1;
 queue<op_t> *pos_to_transform;
+
+auth_t auth = {
+    0, "d41d8cd98f00b204e9800998ecf8427e"
+};
 
 /* timer for receive event */
 void setTimer(double timeout, int *tfd, int i) {
@@ -474,6 +485,7 @@ const op_t* queuedOp(int enqueue, op_t *op) {
     return ret;
 }
 
+void decreaseSem();
 static void sigHandler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         exit(EXIT_SUCCESS);
@@ -481,6 +493,7 @@ static void sigHandler(int sig) {
     else if (sig == SIGSEGV) {
         endwin();
         removeOutFileAtExit();
+        if (sem) decreaseSem();
         signal(sig, SIG_DFL);
         // cerr << "Caught deadly signal: Segmentation Fault" << endl;
         // exit(EXIT_SUCCESS);
@@ -502,6 +515,162 @@ void initSignal() {
     }
 }
 
+void md5sum(char *buf) {
+    if (!(edit_file->getFilename().size()
+        && access(edit_file->getFilename().c_str(), R_OK) == 0))
+    {
+        return;
+    }
+    string md5sum_file = "/tmp/" + out_file_prefix + "md5sum";
+    string cmd = "md5sum " + edit_file->getFilename() + " >"
+                 + md5sum_file;
+    int sys_ret = system(cmd.c_str());
+    if (sys_ret != 0) {
+        EXIT_ERROR("Error calculating md5sum");
+    }
+    int md5_fd = open(md5sum_file.c_str(), O_RDONLY);
+    unlink(md5sum_file.c_str());
+    if (md5_fd == -1) {
+        PROMPT_ERROR_EN("Error reading md5sum");
+        exit(EXIT_FAILURE);
+    }
+    if (read(md5_fd, buf, MD5SUM_SIZE) != MD5SUM_SIZE)
+    {
+        EXIT_ERROR("Error reading md5sum");
+    }
+    close(md5_fd);
+}
+
+void loadAlgo() {
+    const char *err = NULL;
+    if (program_id < 0) {
+        for (program_id = 0; program_id < NR_LIBS; ++program_id) {
+            if ((err = setDllFuncs(1, program_id)) == NULL)
+                break;
+        }
+    }
+    else if (program_id < NR_LIBS) {
+        err = setDllFuncs(1, program_id);
+    }
+    else {
+        err = "Error: cannot find algorithm lib";
+    }
+    if (err != NULL) {
+        cerr << "Error: " << err << endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+void initServer() {
+    if (server_addr.empty()) {
+        write_op_pos = 1;
+        return;
+    }
+    loadAlgo();
+    int s = pthread_create(&write_op_id, NULL, writeOp_Thread, NULL);
+    if (s != 0) {
+        cerr << "OP output not started" << endl;
+    }
+    socket_fd = inetConnect(server_addr.c_str(),
+                            "13127", SOCK_STREAM);
+    if (socket_fd == -1) {
+        PROMPT_ERROR_EN("Error connecting " + server_addr);
+        exit(EXIT_FAILURE);
+    }
+    auth.id = program_id;
+    md5sum(auth.md5sum);
+    // cerr << "Connecting " << server_addr << " ..." << endl;
+    if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
+        || read(socket_fd, &auth, sizeof(auth)) <=0)
+    {
+        EXIT_ERROR("Error authenticating");
+    }
+    program_id = auth.id;
+    pthread_t read_server_id;
+    s = pthread_create(&read_server_id, NULL, readServer_Thread,
+                           NULL);
+    if (s != 0) {
+        cerr << "Server output not started" << endl;
+    }
+    if (sleep_before_send > 0) {
+        pthread_t send_timer_id;
+        int s = pthread_create(&send_timer_id, NULL, sendTimer_Thread,
+                               NULL);
+        if (s != 0) {
+            cerr << "Send timer not started" << endl;
+            close(send_timer_fd);
+            send_timer_fd = -1;
+        }
+    }
+}
+
+void decreaseSem() {
+    int sval;
+    sem_getvalue(sem, &sval);
+    if (sem_trywait(sem) == -1 || sval == 1) {
+        sem_unlink(jupiter_sem.c_str());
+    }
+}
+
+void *moniterServer_Thread(void *arg) {
+#define BUF_LEN (10 * (sizeof(struct inotify_event) + NAME_MAX + 1))
+    char buf[BUF_LEN];
+    op_t op;
+    ssize_t num_read;
+    while (true) {
+        while ((num_read = read(jupiter_fd, &op, sizeof(op_t))) == sizeof(op_t))
+            writeLocal(op);
+        if (num_read == -1)
+            EXIT_ERROR("read jupiter cache file");
+        else if (num_read != 0)
+            lseek(jupiter_fd, -num_read, SEEK_CUR);
+        if (read(inotify_fd, buf, BUF_LEN) <= 0)
+            EXIT_ERROR("read inotify_fd");
+    }
+    return NULL;
+}
+
+void initServerMode() {
+    if (edit_mode >= 0) {
+        return;
+    }
+    md5sum(auth.md5sum);
+    loadAlgo();
+    string filename = string("jupiter-server-") + string(ALGO_VER) + string("-") + string(auth.md5sum);
+    string semname = "/" + filename;
+    filename = "/tmp/" + filename;
+    jupiter_file = filename;
+    jupiter_sem = semname;
+    if (access(filename.c_str(), R_OK) != 0) {
+        cerr << "No user is editing the file" << endl;
+        exit(EXIT_FAILURE);
+    }
+    jupiter_fd = open(jupiter_file.c_str(), O_RDONLY);
+    if (jupiter_fd == -1) {
+        EXIT_ERROR("open jupiter cache file");
+    }
+    sem = sem_open(jupiter_sem.c_str(), O_CREAT, 0600, 0);
+    if (sem == SEM_FAILED) {
+        EXIT_ERROR("open jupiter semaphore");
+    }
+    sem_post(sem);
+    atexit(decreaseSem);
+    auth.id = 0;
+    if ((inotify_fd = inotify_init()) == -1)
+        EXIT_ERROR("inotify_init");
+    if (inotify_add_watch(inotify_fd, jupiter_file.c_str(), IN_MODIFY) == -1)
+        EXIT_ERROR("inotify_add_watch");
+    if (lseek(jupiter_fd, sizeof(user_id_t), SEEK_SET) == -1)
+        EXIT_ERROR("lseek jupiter_fd");
+    pthread_t moniter_id;
+    int s = pthread_create(&moniter_id, NULL, moniterServer_Thread, NULL);
+    if (s != 0) {
+        cerr << "Cannot start moniter thread" << endl;
+        exit(EXIT_FAILURE);
+    }
+    edit_file->setFilename("SERVER");
+}
+
 void init() {
     initSignal();
     tryOpen();
@@ -512,88 +681,8 @@ void init() {
         cerr << "Cannot set exit function\n";
     }
     pos_to_transform = new queue<op_t>;
-    if (server_addr.size()) {
-        const char *err = NULL;
-        if (program_id < 0) {
-            for (program_id = 0; program_id < NR_LIBS; ++program_id) {
-                if ((err = setDllFuncs(1, program_id)) == NULL)
-                    break;
-            }
-        }
-        else if (program_id < NR_LIBS) {
-            err = setDllFuncs(1, program_id);
-        }
-        else {
-            err = "Error: cannot find algorithm lib";
-        }
-        if (err != NULL) {
-            cerr << "Error: " << err << endl;
-            exit(EXIT_FAILURE);
-        }
-        int s = pthread_create(&write_op_id, NULL, writeOp_Thread, NULL);
-        if (s != 0) {
-            cerr << "OP output not started" << endl;
-        }
-        socket_fd = inetConnect(server_addr.c_str(),
-                                "13127", SOCK_STREAM);
-        if (socket_fd == -1) {
-            PROMPT_ERROR_EN("Error connecting " + server_addr);
-            exit(EXIT_FAILURE);
-        }
-        auth_t auth = {
-            program_id, "d41d8cd98f00b204e9800998ecf8427e"
-        };
-        if (edit_file->getFilename().size()
-            && access(edit_file->getFilename().c_str(), R_OK) == 0)
-        {
-            // cerr << "Calculating '" << edit_file->getFilename()
-            //      << "' md5sum..." << endl;
-            string md5sum_file = "/tmp/" + out_file_prefix + "md5sum";
-            string cmd = "md5sum " + edit_file->getFilename() + " >"
-                         + md5sum_file;
-            int sys_ret = system(cmd.c_str());
-            if (sys_ret != 0) {
-                EXIT_ERROR("Error calculating md5sum");
-            }
-            int md5_fd = open(md5sum_file.c_str(), O_RDONLY);
-            unlink(md5sum_file.c_str());
-            if (md5_fd == -1) {
-                PROMPT_ERROR_EN("Error reading md5sum");
-                exit(EXIT_FAILURE);
-            }
-            if (read(md5_fd, auth.md5sum, MD5SUM_SIZE) != MD5SUM_SIZE)
-            {
-                EXIT_ERROR("Error reading md5sum");
-            }
-            close(md5_fd);
-        }
-        // cerr << "Connecting " << server_addr << " ..." << endl;
-        if (writen(socket_fd, &auth, sizeof(auth)) != sizeof(auth)
-            || read(socket_fd, &auth, sizeof(auth)) <=0)
-        {
-            EXIT_ERROR("Error authenticating");
-        }
-        program_id = auth.id;
-        pthread_t read_server_id;
-        s = pthread_create(&read_server_id, NULL, readServer_Thread,
-                               NULL);
-        if (s != 0) {
-            cerr << "Server output not started" << endl;
-        }
-        if (sleep_before_send > 0) {
-            pthread_t send_timer_id;
-            int s = pthread_create(&send_timer_id, NULL, sendTimer_Thread,
-                                   NULL);
-            if (s != 0) {
-                cerr << "Send timer not started" << endl;
-                close(send_timer_fd);
-                send_timer_fd = -1;
-            }
-        }
-    }
-    else {
-        write_op_pos = 1;
-    }
+    initServer();
+    initServerMode();
     redirectStderr();
     edit_file->loadFile(edit_file->getFilename());
     can_start = 1;

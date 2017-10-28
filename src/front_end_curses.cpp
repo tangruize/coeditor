@@ -23,6 +23,7 @@
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() */
 #include <pwd.h>
+#include <semaphore.h>
 
 //#define VERSION "1.1"
 
@@ -62,6 +63,10 @@ typedef const vector<const char *> status_t;
 bool readonly_flag = false;
 bool new_file_flag = false;
 int flags;
+
+/* <0 cannot toggle state, <=0 view mode, >0 edit mode */
+int edit_mode = 1;
+
 
 /* format 1: status bar (last 2 lines),
  * each token's first 2 chars will draw in reverse color
@@ -446,7 +451,15 @@ void redrawTitle() {
     const string prog_name = "  Coeditor " + prog_name_suffix;
     const char modified_str[] = "Modified";
     const char readonly_str[] = "Read-only";
+    char online_user[32] = "Online: ";
     bool is_modified = editing_file->isModified();
+    if (edit_mode < 0) {
+        is_modified = false;
+        int sval;
+        extern sem_t *sem;
+        sem_getvalue(sem, &sval);
+        snprintf(&online_user[8], 20, "%d ", sval - 1);
+    }
     if (!filename.size()) {
         /* new file */
         filename = "New Buffer";
@@ -477,7 +490,13 @@ void redrawTitle() {
     else {
         readonly_flag = false;
     }
-    if (is_modified && size + 4 + sizeof(modified_str) < COLS) {
+    if (edit_mode < 0) {
+        int len = strlen(online_user);
+        if (size + 4 + len < COLS) {
+            mvprintw(0, COLS - len - 1, online_user);
+        }
+    }
+    else if (is_modified && size + 4 + sizeof(modified_str) < COLS) {
         mvprintw(0, COLS - sizeof(modified_str) - 1, modified_str);
     }
     else if (size + 4 + sizeof(readonly_str) < COLS && readonly_flag) {
@@ -911,6 +930,10 @@ void nextPage() {
 }
 
 void setTitleModifiedFlag() {
+    if (edit_mode < 0) {
+        redraw(RD_TITLE);
+        return;
+    }
     static bool flagIsSet = false;
     if (!editing_file->isModified() && flagIsSet) {
         flagIsSet = false;
@@ -1526,9 +1549,13 @@ void keyMouse(bool help_state = false) {
         if (help_state) {
             return;
         }
-        if (mouse_event.y >= TITLE_LINES
-            && mouse_event.y < LINES - STATUS_LINES)
-        {
+        if (mouse_event.y < TITLE_LINES) {
+            preLine();
+        }
+        else if (mouse_event.y >= LINES - STATUS_LINES) {
+            nextLine();
+        }
+        else {
             cur_pos.lineno = mouse_event.y - TITLE_LINES
                              + screen_start_line;
             if (cur_pos.lineno > editing_file->getTotalLines()) {
@@ -1539,41 +1566,6 @@ void keyMouse(bool help_state = false) {
         }
     }
 }
-
-/*
-struct {
-    const char *name;
-    unsigned long mask;
-} mouse_key_test[] = {
-{"BUTTON1_PRESSED          ", BUTTON1_PRESSED        },
-{"BUTTON1_RELEASED         ", BUTTON1_RELEASED       },
-{"BUTTON1_CLICKED          ", BUTTON1_CLICKED        },
-{"BUTTON1_DOUBLE_CLICKED   ", BUTTON1_DOUBLE_CLICKED },
-{"BUTTON1_TRIPLE_CLICKED   ", BUTTON1_TRIPLE_CLICKED },
-{"BUTTON2_PRESSED          ", BUTTON2_PRESSED        },
-{"BUTTON2_RELEASED         ", BUTTON2_RELEASED       },
-{"BUTTON2_CLICKED          ", BUTTON2_CLICKED        },
-{"BUTTON2_DOUBLE_CLICKED   ", BUTTON2_DOUBLE_CLICKED },
-{"BUTTON2_TRIPLE_CLICKED   ", BUTTON2_TRIPLE_CLICKED },
-{"BUTTON3_PRESSED          ", BUTTON3_PRESSED        },
-{"BUTTON3_RELEASED         ", BUTTON3_RELEASED       },
-{"BUTTON3_CLICKED          ", BUTTON3_CLICKED        },
-{"BUTTON3_DOUBLE_CLICKED   ", BUTTON3_DOUBLE_CLICKED },
-{"BUTTON3_TRIPLE_CLICKED   ", BUTTON3_TRIPLE_CLICKED },
-{"BUTTON4_PRESSED          ", BUTTON4_PRESSED        },
-{"BUTTON4_RELEASED         ", BUTTON4_RELEASED       },
-{"BUTTON4_CLICKED          ", BUTTON4_CLICKED        },
-{"BUTTON4_DOUBLE_CLICKED   ", BUTTON4_DOUBLE_CLICKED },
-{"BUTTON4_TRIPLE_CLICKED   ", BUTTON4_TRIPLE_CLICKED },
-#if NCURSES_MOUSE_VERSION > 1
-{"BUTTON5_PRESSED          ", BUTTON5_PRESSED        },
-{"BUTTON5_RELEASED         ", BUTTON5_RELEASED       },
-{"BUTTON5_CLICKED          ", BUTTON5_CLICKED        },
-{"BUTTON5_DOUBLE_CLICKED   ", BUTTON5_DOUBLE_CLICKED },
-{"BUTTON5_TRIPLE_CLICKED   ", BUTTON5_TRIPLE_CLICKED },
-#endif
-};
-*/
 
 /* ^C */
 void printCurPos() {
@@ -1773,34 +1765,11 @@ int calPos() {
 void control() {
     int ch;
     #if NCURSES_MOUSE_VERSION > 1
-    mousemask(BUTTON1_PRESSED | BUTTON1_CLICKED 
-              | MOUSE_SCROLL_UP | MOUSE_SCROLL_DOWN, NULL);
+    mousemask(BUTTON1_PRESSED | MOUSE_SCROLL_UP | MOUSE_SCROLL_DOWN, NULL);
     mouseinterval(0);
     #else
-    mousemask(BUTTON1_PRESSED | BUTTON1_CLICKED, NULL);
+    mousemask(BUTTON1_PRESSED, NULL);
     #endif
-    /* test key codes */
-    /*
-    mousemask(ALL_MOUSE_EVENTS, NULL);
-    int i = 0;
-    MEVENT mouse_event;
-    while (i < sizeof(mouse_key_test) / sizeof(mouse_key_test[0])) {
-        printw("%s%lo\n", mouse_key_test[i].name,
-                          mouse_key_test[i].mask);
-        ++i;
-    }
-    i = getcury(stdscr);
-    while ((ch = wgetch(stdscr)) != 'q') {
-        move(i, 0);
-        clrtoeol();
-        printw("%d %s            ", ch, keyname(ch));
-        if (ch == KEY_MOUSE) {
-            if (getmouse(&mouse_event) == OK)
-                printw("%lo", mouse_event.bstate);
-        }
-        refresh();
-    }
-    */
     /* print read information */
     if (editing_file->getFilename() != "") {
         string read_lines = "Read ";
@@ -1830,7 +1799,6 @@ void control() {
     op_t syn;
     memset(&syn, 0, sizeof(op_t));
     syn.operation = SYN;
-    bool edit_mode = true;
     while (true) {
         setTitleModifiedFlag();
         timeout(150);
@@ -1880,7 +1848,7 @@ void control() {
                 drawStatusMsgImm(NULL);
                 break;
             case KEY_BACKSPACE:
-                if (edit_mode) {
+                if (edit_mode > 0) {
                     keyBackspace();
                 }
                 else {
@@ -1888,8 +1856,11 @@ void control() {
                 }
                 break;
             case KEY_DC:
-                if (edit_mode) {
+                if (edit_mode > 0) {
                     keyDelete();
+                }
+                else {
+                    redraw(RD_STMSG | SM_IMMEDIATE, &view_mode_msg);
                 }
                 break;
             case KEY_MOUSE:
@@ -1900,8 +1871,11 @@ void control() {
         }
         /* insert */
         if (isprint(ch) || ch == '\n' || ch == '\t') {
-            if (edit_mode) {
+            if (edit_mode > 0) {
                 insertChar(ch);
+            }
+            else {
+                redraw(RD_STMSG | SM_IMMEDIATE, &view_mode_msg);
             }
         }
         /* ctrl keys */
@@ -1914,10 +1888,10 @@ void control() {
                     }
                     break;
                 case 'P': /* Prev Line */
-                    preLine();
+                    keyUp();
                     break;
                 case 'N': /* Next Line */
-                    nextLine();
+                    keyDown();
                     break;
                 case 'Y': /* Prev Page */
                     prePage();
@@ -1971,12 +1945,12 @@ void control() {
                     getHelp();
                     break;
                 case 'D': /* delete */
-                    if (edit_mode) {
+                    if (edit_mode > 0) {
                         keyDelete();
                     }
                     break;
                 case 'H': /* backspace */
-                    if (edit_mode) {
+                    if (edit_mode > 0) {
                         keyBackspace();
                     }
                     else {
@@ -1984,13 +1958,14 @@ void control() {
                     }
                     break;
                 case 'R': /* troggle view and edit mode */
-                    if (edit_mode) {
-                        redraw(RD_STMSG | SM_IMMEDIATE, &view_mode_msg);
-                    }
-                    else {
+                    if (edit_mode > 0)
+                        edit_mode = !edit_mode;
+                    if (edit_mode > 0) {
                         redraw(RD_STMSG | SM_IMMEDIATE, &edit_mode_msg);
                     }
-                    edit_mode = !edit_mode;
+                    else {
+                        redraw(RD_STMSG | SM_IMMEDIATE, &view_mode_msg);
+                    }
                     break;
                 default: /* Clear status message bar */
                     drawStatusMsgImm(NULL);

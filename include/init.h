@@ -30,6 +30,7 @@ extern bool no_debug;
 extern textOp *edit_file;
 extern user_id_t program_id;
 extern int can_sim;
+extern int edit_mode;
 
 void removeOutFileAtExit();
 void setOutFilenames();

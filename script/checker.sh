@@ -87,5 +87,6 @@ for i in ${PIDS[@]}; do
     ${EXE_DIR}/op-generator $GEN_NUM > $CLI_FILE &
 done
 
-cat
-wait
+$EXE -S
+
+kill $$
