@@ -38,17 +38,7 @@ XINETD_FILE=/etc/xinetd.d/jupiter
 
 INETD=$(echo -e "jupiter\t\tstream\ttcp\tnowait\t${NORM_USER}\t$(realpath ${EXE})\t$(realpath ${EXE})")
 SERVICE=$(echo -e "jupiter\t\t$((78663&0xffff))/tcp\t\t\t# Jupiter service")
-XINETD=$(echo -e "service jupiter\n{\n\tdisable\t\t= no\n\tsocket_type\t= stream\n\tprotocol\t= tcp\n\tuser\t\t= ${NORM_USER}\n\twait\t\t= no\n\tserver\t\t= $(realpath $EXE)\n\tonly_from\t= 127.0.0.1 ::1\n\tflags\t\t= IPv6\n}")
-
-echo
-if grep jupiter $SERVICE_FILE &> /dev/null; then
-    sed -i 's~^jupiter.*~'"$SERVICE~g" "$SERVICE_FILE"
-    echo Updated \'$SERVICE_FILE\':
-else
-    echo "$SERVICE" >> "$SERVICE_FILE"
-    echo Appended to \'$SERVICE_FILE\':
-fi
-echo "$SERVICE"
+XINETD=$(echo -e "service unlisted\n{\n\ttype\t\t= UNLISTED\n\tport\t\t= $((78663&0xffff))\n\tdisable\t\t= no\n\tsocket_type\t= stream\n\tprotocol\t= tcp\n\tuser\t\t= ${NORM_USER}\n\twait\t\t= no\n\tserver\t\t= $(realpath $EXE)\n\tonly_from\t= 127.0.0.1 ::1\n\tflags\t\t= IPv6\n\tinstances\t= 64\n}")
 
 echo
 if which xinetd &> /dev/null; then
@@ -57,6 +47,15 @@ if which xinetd &> /dev/null; then
     echo "$XINETD"
     killall -HUP xinetd
 elif which inetd &> /dev/null; then
+    echo
+    if grep jupiter $SERVICE_FILE &> /dev/null; then
+        sed -i 's~^jupiter.*~'"$SERVICE~g" "$SERVICE_FILE"
+        echo Updated \'$SERVICE_FILE\':
+    else
+        echo "$SERVICE" >> "$SERVICE_FILE"
+        echo Appended to \'$SERVICE_FILE\':
+    fi
+    echo "$SERVICE"
     if grep jupiter $INETD_FILE &> /dev/null; then
         sed -i 's~^jupiter.*~'"$INETD~g" "$INETD_FILE"
         echo Updated \'$INETD_FILE\':
