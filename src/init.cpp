@@ -68,6 +68,8 @@ auth_t auth = {
     0, "d41d8cd98f00b204e9800998ecf8427e"
 };
 
+volatile int can_start = 0;
+
 /* timer for receive event */
 void setTimer(double timeout, int *tfd, int i) {
     struct timespec ts;
@@ -395,7 +397,6 @@ void *writeOp_Thread(void *args) {
     return NULL;
 }
 
-volatile int can_start = 0;
 void *readServer_Thread(void *args) {
     pthread_detach(pthread_self());
     while (can_start == 0);
@@ -682,9 +683,9 @@ void init() {
     }
     pos_to_transform = new queue<op_t>;
     initServer();
+    edit_file->loadFile(edit_file->getFilename());
     initServerMode();
     redirectStderr();
-    edit_file->loadFile(edit_file->getFilename());
     can_start = 1;
     //prompt_t msg = edit_file->loadFile(edit_file->getFilename());
     //PROMPT_ERROR(msg);
