@@ -1,4 +1,4 @@
-LDFLAGS = -pthread -lncurses -ltinfo -lgpm -ldl -export-dynamic -Wl,-rpath,'$$ORIGIN'/lib
+LDFLAGS = -pthread -lncurses -ldl -export-dynamic -Wl,-rpath,'$$ORIGIN'/lib
 
 EXE = ../coeditor
 
